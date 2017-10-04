@@ -46,12 +46,17 @@ class Net(object):
         # if self.get_layer_info(layer_name) is None:
         # return True
         # return False
-    def get_block_data(self, blob_name, scope, pad=0):
+    def get_block_data(self, blob_name, all_spatial_positions, pad=0):
         data = self._net.blob[blob_name].data[self.img_idx]
+        if pad:
+            data_paded = np.lib.pad(data, pad, mode='constant')[pad:-pad]
+        else:
+            data_paded = data
         # data C,H,W
-
-
-
+        h = [spatial_position[0] for spatial_position in all_spatial_positions]
+        w = [spatial_position[1] for spatial_position in all_spatial_positions]
+        c = np.arange(len(h))
+        return data_paded[(c, h, w)]
 
     def get_children_layer_name(self, current_layer_name, include_scale=False):
 
