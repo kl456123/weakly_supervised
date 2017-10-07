@@ -12,8 +12,6 @@ class Net(object):
         self.model_weights = os.path.abspath(model_weights)
 
         self._net = caffe.Net(model_def, model_weights, caffe.TEST)
-        # self._auxiliary_layer_info = None
-        # self.auxiliary_layer_sequence=None
         self.generate_layer_info(model_def)
         # for load data into layer
         if not deploy:
@@ -25,51 +23,19 @@ class Net(object):
         # self.set_layer_info()
         self.receptive_field_info = {}
         self.generate_layer_sequence()
-        self.generate_auxiliary_layer_sequence()
-        self.generate_all_receptive_field()
-        self.all_layer_sequence = self.layer_sequence +\
-            self.auxiliary_layer_sequence
+        self.all_layer_sequence = self.layer_sequence
 
-    def generate_auxiliary_layer_sequence(self):
-        self.auxiliary_layer_sequence =\
-            self._auxiliary_layer_info.keys()
-
-    # def reverse_auxiliary_layer(self, class_id):
-        # auxiliary_layer_sequence = self.auxiliary_layer_sequence
-        # for layer_name in reversed(auxiliary_layer_sequence):
-        # top_blob_name = self._net.top_names[layer_name][0]
-        # data = self._net.blobs[top_blob_name].data
-        # weight, bias = self.get_param_data(layer_name)
-        # class_weight = weight[class_id]
-
-        # def check_is_scale_layer(self, layer_name):
-        # if self.get_layer_info(layer_name) is None:
-        # return True
-        # return False
-    # def get_block_data(self, blob_name, all_spatial_positions, pad=0):
-        # data = self._net.blob[blob_name].data[self.img_idx]
-        # if pad:
-        # data_paded = np.lib.pad(data, pad, mode='constant')[pad:-pad]
-        # else:
-        # data_paded = data
-        # # data C,H,W
-        # h = [spatial_position[0] for spatial_position in all_spatial_positions]
-        # w = [spatial_position[1] for spatial_position in all_spatial_positions]
-        # c = np.arange(len(h))
-        # return data_paded[(c, h, w)]
-
-    def get_block_data(self, bottom_name, all_spatial_positions, P):
+    def get_block_data(self, bottom_name, all_positions, P):
         if (P != 0):
             data_paded = np.lib.pad(self.net._net.blobs[bottom_name].data[self.img_idx, :, :, :],
                                     P,
                                     'constant',
                                     constant_values=0)[P:-P]
         else:
-            data_paded = self.net._net.blobs[bottom_name].data[self.img_idx]
-        h = [spatial_position[0] for spatial_position in all_spatial_positions]
-        w = [spatial_position[1] for spatial_position in all_spatial_positions]
-        c = np.arange(len(h))
-        return data_paded[c, h, w]
+            data_paded = self._net.blobs[bottom_name].data[self.img_idx]
+        h = [pos[1] for pos in all_positions]
+        w = [pos[2] for pos in all_positions]
+        return data_paded[:, h, w]
 
     def get_children_layer_name(self, current_layer_name, include_scale=False):
 
@@ -119,7 +85,6 @@ class Net(object):
     def get_bottom_name(self, layer_name):
         return self._net.bottom_names[layer_name][0]
 
-
     def get_blob_info_by_layer_name(self, current_layer_name):
         # stop()
         # top blob info is in the top of layer
@@ -145,7 +110,7 @@ class Net(object):
         return weight.shape[-2] * weight.shape[-1]
 
     def generate_layer_info(self, prototxt):
-        self._layer_info, self._auxiliary_layer_info = parse_net_proto(
+        self._layer_info = parse_net_proto(
             prototxt)
 
     def generate_layer_sequence(self):
@@ -156,8 +121,6 @@ class Net(object):
     def get_layer_info(self, layer_name):
         if layer_name in self.layer_sequence:
             return self._layer_info[layer_name]
-        elif layer_name in self.auxiliary_layer_sequence:
-            return self._auxiliary_layer_info[layer_name]
         else:
             print '{:s} is scale layer,return None'.format(layer_name)
             return None
@@ -427,8 +390,6 @@ class Net(object):
         self.receptive_field_info[current_layer_name] = top_receptive_field
 
     def get_receptive_field(self, layer_name, name_type='layer'):
-        if layer_name in self.auxiliary_layer_sequence:
-            return np.inf
         if layer_name not in self.receptive_field_info:
             self.generate_receptive_field(layer_name)
         return self.receptive_field_info[layer_name]

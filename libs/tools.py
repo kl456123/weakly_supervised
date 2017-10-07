@@ -601,62 +601,116 @@ def parse_net_proto(prototxt):
         Merge(f.read(), net_param)
     layer_names = []
     all_layer_info = OrderedDict()
-    # store fc layer
-    auxiliary_info = OrderedDict()
-    negative_slope = None
     is_bn = 0
     for layer in net_param.layer:
         layer_name = layer.name
         one_layer_info = {}
         # one_layer_info['ps'] = layer.
         if layer.type == 'Pooling':
+            one_layer_info['type'] = 'pooling'
             param = layer.pooling_param
-            # pooling_param  = caffe_pb2.PoolingParameter()
             one_layer_info['pooling'] = 'max' if param.pool == 0 else 'ave'
-
-            # default value for Pooling layer
-            # note that Pooling layer don't support ps operation
-            one_layer_info['ps'] = False
+            one_layer_info['kernel_size'] = help_parse(param.kernel_size, None)
             one_layer_info['bn'] = False
-            one_layer_info['dilation'] = 1
+            one_layer_info['stride'] = help_parse(param.stride, 'stride')
         elif layer.type == 'Convolution':
+            one_layer_info['type'] = 'conv'
             param = layer.convolution_param
-            one_layer_info['ps'] = help_parse(param.position_sensetive, 'ps')
+            one_layer_info['kernel_size'] = help_parse(param.kernel_size, None)
             one_layer_info['dilation'] = help_parse(param.dilation, 'dilation')
             one_layer_info['bn'] = False
+            one_layer_info['pad'] = help_parse(param.pad, 'pad')
+            one_layer_info['stride'] = help_parse(param.stride, 'stride')
+            one_layer_info['pad'] = help_parse(param.pad, 'pad')
         elif layer.type == 'ReLU':
-            negative_slope = help_parse(
-                layer.relu_param.negative_slope, 'negative_slope')
-            continue
+            one_layer_info['type'] = 'relu'
+            param = layer.relu_param
+            one_layer_info['negative_slope'] = help_parse(param.negative_slope,
+                                                          'negative_slope')
         elif layer.type == 'BatchNorm' or layer.type == 'Scale':
             is_bn += 1
             continue
         elif layer.type == 'InnerProduct':
             param = layer.inner_product_param
+            one_layer_info['type'] = 'fc'
             one_layer_info['num_output'] = param.num_output
-            one_layer_info['negative_slope'] = 1
-            one_layer_info['bn'] = False
-            # pad is for the bottom blob here
-            one_layer_info['pad'] = 0
         else:
             print 'skip layer {:s}'.format(layer.name)
             continue
-        if negative_slope is not None:
-            one_layer_info['negative_slope'] = negative_slope
-            negative_slope = None
         if is_bn == 2:
             all_layer_info[layer_names[-1]]['bn'] = True
             is_bn = 0
-        if layer.type == 'InnerProduct':
-            auxiliary_info[layer_name] = one_layer_info
-            continue
-        one_layer_info['kernel_size'] = help_parse(param.kernel_size, None)
-        one_layer_info['pad'] = help_parse(param.pad, 'pad')
-        one_layer_info['stride'] = help_parse(param.stride, 'stride')
         layer_names.append(layer_name)
         all_layer_info[layer_name] = one_layer_info
     all_layer_info[layer_names[-1]]['bn'] = False
-    return all_layer_info, auxiliary_info
+    return all_layer_info
+
+
+# def parse_net_proto(prototxt):
+    # from caffe.proto import caffe_pb2
+    # from google.protobuf.text_format import Merge
+    # from collections import OrderedDict
+    # net_param = caffe_pb2.NetParameter()
+    # with open(prototxt, 'r') as f:
+        # Merge(f.read(), net_param)
+    # layer_names = []
+    # all_layer_info = OrderedDict()
+    # # store fc layer
+    # auxiliary_info = OrderedDict()
+    # negative_slope = None
+    # is_bn = 0
+    # for layer in net_param.layer:
+        # layer_name = layer.name
+        # one_layer_info = {}
+        # # one_layer_info['ps'] = layer.
+        # if layer.type == 'Pooling':
+            # param = layer.pooling_param
+            # # pooling_param  = caffe_pb2.PoolingParameter()
+            # one_layer_info['pooling'] = 'max' if param.pool == 0 else 'ave'
+
+            # # default value for Pooling layer
+            # # note that Pooling layer don't support ps operation
+            # one_layer_info['ps'] = False
+            # one_layer_info['bn'] = False
+            # one_layer_info['dilation'] = 1
+        # elif layer.type == 'Convolution':
+            # param = layer.convolution_param
+            # one_layer_info['ps'] = help_parse(param.position_sensetive, 'ps')
+            # one_layer_info['dilation'] = help_parse(param.dilation, 'dilation')
+            # one_layer_info['bn'] = False
+        # elif layer.type == 'ReLU':
+            # negative_slope = help_parse(
+                # layer.relu_param.negative_slope, 'negative_slope')
+            # continue
+        # elif layer.type == 'BatchNorm' or layer.type == 'Scale':
+            # is_bn += 1
+            # continue
+        # elif layer.type == 'InnerProduct':
+            # param = layer.inner_product_param
+            # one_layer_info['num_output'] = param.num_output
+            # one_layer_info['negative_slope'] = 1
+            # one_layer_info['bn'] = False
+            # # pad is for the bottom blob here
+            # one_layer_info['pad'] = 0
+        # else:
+            # print 'skip layer {:s}'.format(layer.name)
+            # continue
+        # if negative_slope is not None:
+            # one_layer_info['negative_slope'] = negative_slope
+            # negative_slope = None
+        # if is_bn == 2:
+            # all_layer_info[layer_names[-1]]['bn'] = True
+            # is_bn = 0
+        # if layer.type == 'InnerProduct':
+            # auxiliary_info[layer_name] = one_layer_info
+            # continue
+        # one_layer_info['kernel_size'] = help_parse(param.kernel_size, None)
+        # one_layer_info['pad'] = help_parse(param.pad, 'pad')
+        # one_layer_info['stride'] = help_parse(param.stride, 'stride')
+        # layer_names.append(layer_name)
+        # all_layer_info[layer_name] = one_layer_info
+    # all_layer_info[layer_names[-1]]['bn'] = False
+    # return all_layer_info, auxiliary_info
 
 
 def threshold_system(queue, **kwargs):
