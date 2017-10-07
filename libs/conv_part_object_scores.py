@@ -7,15 +7,6 @@ import numpy as np
 # false when out of interval(include boundary)
 
 
-def _check_in(x, l, r):
-    if x > r or x < l:
-        return False
-    return True
-
-
-def _get(value, default):
-    return value if value is not None else default
-
 # part object in conv layer output
 # position is 3D
 
@@ -41,17 +32,18 @@ class Conv_Part_Object(object):
         # note that score map is tuple
         self._score_map = None
         self._children_pos = None
+        self._children_spatial_pos = None
 
         self.rec_field = None
         self._children_rec_field = None
-        self._all_children_kernel_weight = None
+        self._children_kernel_weight = None
 
     # all get function
     def get_prior_score(self):
         return self._prior_score
 
-    def get_all_children_kernel_weight(self):
-        return self._all_children_kernel_weight
+    def get_children_kernel_weight(self):
+        return self._children_kernel_weight
 
     def get_children_pos(self):
         return self._children_pos
@@ -74,7 +66,7 @@ class Conv_Part_Object(object):
     def __gen_is_pad(self):
         top_name = self.net._net.top_names[self.layer_name][0]
         h, w = self.net._net.blobs[top_name].data.shape[2:]
-        top_blob_info = self.net.get_blob_info_by_layer_name(self._layer_name)
+        top_blob_info = self.net.get_blob_info_by_layer_name(self.layer_name)
         if top_blob_info is None:
             # no parent layer exist
             pad = 0
@@ -97,34 +89,36 @@ class Conv_Part_Object(object):
         self.neg_slope = neg_slope if neg_slope is not None else 1
 
     def __gen_rece_field(self):
-        # top_name = self._net._net.top_names[self._layer_name][0]
         if self._layer_type == 'fc':
             self.receptive_field = np.inf
         else:
             self.receptive_field = self._net.get_receptive_field(
-                self._layer_name)
+                self.layer_name)
 
     def __gen_children_rece_field(self):
-        children_layer_name = self.get_children_layer_name()
         self.children_receptive_field = self.net.get_receptive_field(
-            children_layer_name)
+            self.children_layer_name)
 
     def __gen_children_layer_name(self):
-        self._children_layer_name = self._net.get_children_layer_name(
-            self._layer_name)
+        self.children_layer_name = self.net.get_children_layer_name(
+            self.layer_name)
 
     def __gen_raw_spatial_pos(self):
-        top_name = self._net._net.top_names[self._layer_name][0]
+        top_name = self._net._net.top_names[self.layer_name][0]
         feat_map_size = self._net._net.blobs[top_name].data.shape[2:]
         raw_map_size = self._net._net.blobs['data'].data.shape[2:]
         self.raw_spatial_pos = feat_map_raw(
             self.spatial_pos, feat_map_size, raw_map_size)
 
-    def __gen_child_spatial_pos(self):
-        self.child_spatial_pos = np.array(help_out_map_ins(
+    def __gen_children_spatial_pos(self):
+        self._children_spatial_pos = np.array(help_out_map_ins(
             self.pos,
             self.layer_name,
             self.net))
+
+    def __gen_children_pos(self):
+        self.children_pos = [
+            [None] + spatial_pos for spatial_pos in self.child_spatial_pos]
 
     def __gen_kernel(self, kernel_weight):
         layer_info = self.net.get_layer_info(self.layer_name)
@@ -142,8 +136,8 @@ class Conv_Part_Object(object):
         self.kernel = [weighted_weight.sum(axis=0),
                        weighted_bias.sum(axis=0)]
 
-    def __gen_score_map_and_all_children_kernel_weight(self):
-        layer_name = self._layer_name
+    def __gen_score_map_and_children_kernel_weight(self):
+        layer_name = self.layer_name
         layer_info = self.net.get_layer_info(layer_name)
         pad = _get(layer_info.get('pad'))
         weight, bias = self.get_mutable_kernel()
@@ -152,7 +146,7 @@ class Conv_Part_Object(object):
         kdim = w * h
         bottom_blob_name = self.net._net.bottom_names[layer_name][0]
         data = self.net.get_block_data(bottom_blob_name,
-                                       self.children_pos,
+                                       self._children_spatial_pos,
                                        pad=pad)
 
         assert weight.shape == data.shape, 'weight and data must have the same shape'
@@ -162,7 +156,7 @@ class Conv_Part_Object(object):
         self._score_map = (conv.sum(axis=0), bias + self.get_prior_score())
         weight[np.where(data < 0)] *= self.neg_slope
 
-        self._all_children_kernel_weight = weight.reshape(
+        self._children_kernel_weight = weight.reshape(
             (-1, kdim)).transpose((1, 0))
 
     def init(self, kernel_weight):
@@ -170,11 +164,12 @@ class Conv_Part_Object(object):
         if self.is_pad:
             return
         self.__gen_children_layer_name()
-        self.__gen_child_spatial_pos()
+        self.__gen_children_spatial_pos()
+        self.__gen_children_pos()
         self.__gen_rece_field()
         self.__gen_raw_spatial_pos()
         self.__gen_kernel(kernel_weight)
-        self.__gen_score_map_and_all_children_kernel_weight(self.neg_slope)
+        self.__gen_score_map_and_children_kernel_weight()
 
     # def visualize_children(self, pixel_val=0.5):
         # raw_spatial_pos = help_out_map_ins(

@@ -46,17 +46,30 @@ class Net(object):
         # if self.get_layer_info(layer_name) is None:
         # return True
         # return False
-    def get_block_data(self, blob_name, all_spatial_positions, pad=0):
-        data = self._net.blob[blob_name].data[self.img_idx]
-        if pad:
-            data_paded = np.lib.pad(data, pad, mode='constant')[pad:-pad]
+    # def get_block_data(self, blob_name, all_spatial_positions, pad=0):
+        # data = self._net.blob[blob_name].data[self.img_idx]
+        # if pad:
+        # data_paded = np.lib.pad(data, pad, mode='constant')[pad:-pad]
+        # else:
+        # data_paded = data
+        # # data C,H,W
+        # h = [spatial_position[0] for spatial_position in all_spatial_positions]
+        # w = [spatial_position[1] for spatial_position in all_spatial_positions]
+        # c = np.arange(len(h))
+        # return data_paded[(c, h, w)]
+
+    def get_block_data(self, bottom_name, all_spatial_positions, P):
+        if (P != 0):
+            data_paded = np.lib.pad(self.net._net.blobs[bottom_name].data[self.img_idx, :, :, :],
+                                    P,
+                                    'constant',
+                                    constant_values=0)[P:-P]
         else:
-            data_paded = data
-        # data C,H,W
+            data_paded = self.net._net.blobs[bottom_name].data[self.img_idx]
         h = [spatial_position[0] for spatial_position in all_spatial_positions]
         w = [spatial_position[1] for spatial_position in all_spatial_positions]
         c = np.arange(len(h))
-        return data_paded[(c, h, w)]
+        return data_paded[c, h, w]
 
     def get_children_layer_name(self, current_layer_name, include_scale=False):
 
@@ -102,6 +115,10 @@ class Net(object):
         for idx, layer_name in enumerate(self.all_layer_sequence):
             if layer_name == current_layer_name:
                 return self.all_layer_sequence[idx + 1]
+
+    def get_bottom_name(self, layer_name):
+        return self._net.bottom_names[layer_name][0]
+
 
     def get_blob_info_by_layer_name(self, current_layer_name):
         # stop()

@@ -6,6 +6,16 @@ import matplotlib.pyplot as plt
 from random import random as rand
 
 
+def _check_in(x, l, r):
+    if x > r or x < l:
+        return False
+    return True
+
+
+def _get(value, default):
+    return value if value is not None else default
+
+
 def feat_map_raw(activated_points, feat_map_size, raw_map_size):
     if type(feat_map_size) is int:
         feat_map_size = (feat_map_size, feat_map_size)
