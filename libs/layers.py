@@ -3,6 +3,7 @@
 
 from libs.tools import _get, stop
 from libs.points import *
+import numpy as np
 
 
 class Layers(object):
@@ -78,99 +79,38 @@ class Layers(object):
         S = _get(layer_info['stride'], 1)
         # output point is 3D
         # dim = points[0].dim
-        all_points_3D = []
+        bottom_points_3D = []
         bottom_name = self.net._net.bottom_names[layer_name][0]
-        FC = 1 if points[0].pos[1] is None else 0
-        if FC:
-            # comes from fc layer
-            # it has no spatial strution
-            top_name = self.net._net.top_names[layer_name][0]
-            data = self.net._net.blobs[top_name].data[self.net.img_idx]
-            c, h, w = data.shape
-            num = c * h * w
-            positions_3D = np.array(np.unravel_index(
-                np.arange(num), data.shape)).T
-            points = convert_2Dto3D(points[0], positions_3D)
-            # else:
-            # comes from conv layer
-            # default dilation =1,pad = 0 for pooling layer
-        dim = points[0].dim
-        for point in points:
+        # all point_2D must be converted to 3D before passing through pooling layer
+        top_points_3D = []
+        if points[0].dim == 2:
+            for point in points:
+                top_name = self.net._net.top_names[layer_name][0]
+                data = self.net._net.blobs[top_name].data[self.net.img_idx]
+                c, h, w = data.shape
+                num = c * h * w
+                positions_3D = np.array(np.unravel_index(
+                    np.arange(num), data.shape)).T
+                points_3D = convert_2Dto3D(points[0], positions_3D)
+                top_points_3D += points_3D
 
-            if dim == 3:
+        for point in top_points_3D:
+            assert point.dim == 3, 'all points must be converted to 3D first'
+            # 3D
+            # just one child
             pos = point.pos
-
             children_pos = point.get_children_pos(K, S, 1)
             data = self.net.get_block_data(
                 bottom_name, children_pos, 0)
-            c = data.shape[0]
-            mask = data.reshape(c, -1).argmax(axis=1)
-            mask = np.unravel_index(mask, (c, K, K))
-            positions_3D = []
-            x = mask[1] + pos[1]
-            y = mask[2] + pos[2]
+            idx = np.argmax(data, axis=0)
+            h, w = np.unravel_index(idx, (K, K))
+            point_3D = Point_3D((pos[0], h, w), point.weight, point.prior)
+            bottom_points_3D.append(point_3D)
 
-            positions_3D = mask + pos
-            positions_3D = np.array(
-                np.arange(c), mask[0] + pos[0], mask[1] + pos[1]).T
-            children_val = data[np.arange(c), mask[0], mask[1]]
-            # contribution of each point_3D,so we filter negative value
-            scores = children_val * point.weight
-            keep = scores > 0
-            points_3D = convert_2Dto3D(point, positions_3D)
-            # filter
-            points_3D = [points_3D[idx] for idx in keep[0]]
-            all_points_3D.append(point_3D)
-            else:
-            # raise NotImplementedError
-        pooling_blob_shape = self.net._net.blobs[bottom_name]
-        all_points_3D = merge_points(all_points_3D, pooling_blob_shape)
-        return all_points_3D
+        pooling_blob_shape = self.net._net.blobs[bottom_name].data.shape[1:]
+        bottom_points_3D = merge_points(bottom_points_3D, pooling_blob_shape)
+        return bottom_points_3D
 
-    # def pool(self, layer_name, points):
-        # stop()
-        # layer_info = self.net.get_layer_info(layer_name)
-        # K = layer_info['kernel_size']
-        # S = _get(layer_info['stride'], 1)
-        # # output point is 3D
-        # dim = points[0].dim
-        # all_points_3D = []
-        # bottom_name = self.net._net.bottom_names[layer_name][0]
-        # for point in points:
-
-        # if dim == 2:
-
-        # if point.pos[1] is None:
-        # FC = 1
-        # # comes from fc layer
-        # # it has no spatial strution
-        # data = self.net._net.blobs[bottom_name].data[self.net.img_idx]
-        # else:
-        # FC = 0
-        # # comes from conv layer
-        # # default dilation =1,pad = 0 for pooling layer
-        # children_pos = point.get_children_pos(K, S, 1)
-        # data = self.net.get_block_data(
-        # bottom_name, children_pos, 0)
-        # c, h, w = data.shape
-        # mask = data.reshape(c, -1).argmax(axis=1)
-        # mask = np.unravel_index(mask, (h, w))
-        # if not FC:
-        # positions_3D = zip(
-        # np.arange(c), mask[0] - pos[0], mask[1] - pos[1])
-        # children_val = data[np.arange(c), mask[0], mask[1]]
-        # # contribution of each point_3D,so we filter negative value
-        # scores = children_val * point.weight
-        # keep = scores > 0
-        # points_3D = convert_2Dto3D(point, positions_3D)
-        # # filter
-        # points_3D = [points_3D[idx] for idx in keep[0]]
-        # all_points_3D.append(point_3D)
-        # else:
-        # raise NotImplementedError
-        # pooling_blob_shape = self.net._net.blobs[bottom_name]
-        # all_points_3D = merge_points(all_points_3D, pooling_blob_shape)
-        # return all_points_3D
 
     def fc(self, layer_name, points):
         # output point is 2D,just like 1x1 conv
