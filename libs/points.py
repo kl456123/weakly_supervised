@@ -6,21 +6,22 @@ import numpy as np
 
 class Point(object):
     def __init__(self, pos, weight, prior=0):
+        # note that if pos <0 means that it is in pad of image
         self.pos = pos
         self.weight = weight
-        self.dim = 2 if pos[0] is None else 3
+        self.dim = 2 if np.isnan(pos[0]) else 3
         self.prior = prior
 
-    def get_children_pos(self, K, S, D):
+    def get_children_pos(self, K, S=1, D=1, P=0):
         pos = self.pos
         K = (K - 1) * (D - 1) + K
-        H = np.arange(S * pos[1], S * pos[1] + K, D)
-        W = np.arange(S * pos[2], S * pos[2] + K, D)
+        H = np.arange(S * pos[1], S * pos[1] + K, D) - P
+        W = np.arange(S * pos[2], S * pos[2] + K, D) - P
         res = []
         for h in H:
             for w in W:
-                res.append([None, h, w])
-        return res
+                res.append([np.nan, h, w])
+        return np.array(res)
 
 
 class Point_2D(Point):
@@ -58,7 +59,7 @@ def merge_points(points_3D, shape_3D):
     score = np.zeros(shape_3D)
     prior = np.zeros(shape_3D)
     for point in points_3D:
-        coord = tuple(point.pos)
+        # coord = tuple(point.pos)
         # if mask[coord] ==0:
         mask[coord] = 1
         score[coord] += point.weight

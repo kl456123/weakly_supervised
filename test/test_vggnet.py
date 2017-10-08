@@ -47,7 +47,7 @@ def test_vggnet():
     prior = 0
     kernel_weight = np.zeros((num_classes,))
     kernel_weight[cls_idx] = 1
-    pos = [None, None, None]
+    pos = [np.nan, np.nan, np.nan]
     start_points = [Point_2D(pos, kernel_weight, prior)]
     points = layer.backward(start_points)
     print points[0]

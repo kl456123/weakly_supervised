@@ -27,14 +27,17 @@ class Net(object):
 
     def get_block_data(self, bottom_name, all_positions, P):
         if (P != 0):
-            data_paded = np.lib.pad(self.net._net.blobs[bottom_name].data[self.img_idx, :, :, :],
+            data_paded = np.lib.pad(self._net.blobs[bottom_name].data[self.img_idx, :, :, :],
                                     P,
                                     'constant',
                                     constant_values=0)[P:-P]
         else:
             data_paded = self._net.blobs[bottom_name].data[self.img_idx]
-        h = [pos[1] for pos in all_positions]
-        w = [pos[2] for pos in all_positions]
+        if all_positions is None or len(all_positions) == 0:
+            return data_paded
+
+        h = [int(pos[1]) + P for pos in all_positions]
+        w = [int(pos[2]) + P for pos in all_positions]
         return data_paded[:, h, w]
 
     def get_children_layer_name(self, current_layer_name, include_scale=False):
