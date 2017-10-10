@@ -11,7 +11,7 @@ class Layers(object):
         self.net = net
 
 # output point is 2D
-    def conv(self, layer_name, points):
+    def conv(self, layer_name, points, isFilter=True):
         # stop()
         layer_info = self.net.get_layer_info(layer_name)
         K = layer_info['kernel_size']
@@ -43,8 +43,11 @@ class Layers(object):
             conv = weighted_weight * data
             c, h, w = conv.shape
             kdim = h * w
-            score_map = conv.sum(axis=0) + weighted_bias + point.prior
-            keep = score_map > 0
+            score_map = conv.sum(axis=0) + (weighted_bias + point.prior) / kdim
+            if isFilter:
+                keep = score_map > 0
+            else:
+                keep = score_map > -np.inf
             keep_weight = weighted_weight[:, keep].transpose((1, 0))
             keep_pos = children_pos[keep.ravel()]
             num_keep = keep_pos.shape[0]
@@ -80,7 +83,7 @@ class Layers(object):
                     weight *= negative_slope
         return points
 
-    def pool(self, layer_name, points):
+    def pool(self, layer_name, points, isFilter=True):
         # stop()
         layer_info = self.net.get_layer_info(layer_name)
         K = layer_info['kernel_size']
@@ -121,7 +124,7 @@ class Layers(object):
             data = self.net.get_block_data(
                 bottom_name, children_pos, 0)
             idx = np.argmax(data[c], axis=0)
-            if data[c, idx] == 0:
+            if isFilter and data[c, idx] * point.weight <= 0:
                 # filter
                 continue
             x, y = np.unravel_index(idx, (K, K))
@@ -147,20 +150,54 @@ class Layers(object):
         prior = point_2D.prior + weighted_bias
         return [Point_2D([np.nan, np.nan, np.nan], weighted_weight, prior)]
 
-    def backward(self, points):
+    def backward(self,
+                 points,
+                 start_layer_name,
+                 log=True,
+                 isFilter=True):
         all_layer_sequence = self.net.all_layer_sequence
+        start_flag = 0
         for layer_name in reversed(all_layer_sequence):
+            if start_layer_name == layer_name:
+                start_flag = 1
+            if not start_flag:
+                continue
             layer_info = self.net.get_layer_info(layer_name)
             layer_type = layer_info['type']
             if layer_type == 'fc':
                 points = self.fc(layer_name, points)
             elif layer_type == 'conv':
-                points = self.conv(layer_name, points)
+                points = self.conv(layer_name, points, isFilter)
             elif layer_type == 'pooling':
-                points = self.pool(layer_name, points)
+                points = self.pool(layer_name, points, isFilter)
             elif layer_type == 'relu':
                 points = self.relu(layer_name, points)
+            if log:
+                print 'layer_name: {:s},\tnumber: {:d}'\
+                    .format(layer_name, len(points))
+
+                print 'scores: {:.2f}'.\
+                    format(self.get_points_scores(points, layer_name))
         return points
+
+    def get_points_scores(self, points, layer_name):
+        bottom_name = self.net._net.bottom_names[layer_name][0]
+        data = self.net._net.blobs[bottom_name].data[self.net.img_idx]
+        dim = points[0].dim
+        res = 0
+        for point in points:
+            pos = point.pos
+            if dim == 2:
+                if len(data.shape) == 1:
+                    score = point.weight * data[0]
+                else:
+                    score = point.weight * data[:, int(pos[1]), int(pos[2])]
+                score = score.sum(axis=0)
+            else:
+                score = point.weight * \
+                    data[int(pos[0]), int(pos[1]), int(pos[2])]
+            res += score
+        return res
 
 
 def check_is_pad(pos, shape):

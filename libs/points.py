@@ -11,6 +11,7 @@ class Point(object):
         self.weight = weight
         self.dim = 2 if np.isnan(pos[0]) else 3
         self.prior = prior
+        self.score = 0
 
     def get_children_pos(self, K, S=1, D=1, P=0):
         pos = self.pos
@@ -29,7 +30,10 @@ class Point_2D(Point):
         assert len(kernel_weight.shape) == 1
         super(Point_2D, self).__init__(pos, kernel_weight, prior)
 
-    # def get_children_pos_3D(self, shape_3D):
+    # def set_score(self, point_data):
+        # assert point_data
+
+        # def get_children_pos_3D(self, shape_3D):
         # num = weight.shape[0]
         # C, H, W = shape_3D
         # assert C * H * W == num
@@ -38,8 +42,16 @@ class Point_2D(Point):
 
 class Point_3D(Point):
     def __init__(self, pos, weight, prior=0):
+        if isinstance(weight, int) or isinstance(weight, float):
+            weight = np.array(weight)
         assert len(weight.shape) == 0
         super(Point_3D, self).__init__(pos, weight, prior)
+
+    # def set_score(self, point_data):
+        # assert isinstance(point_data, int) \
+        # or isinstance(point_data, float),\
+        # 'input data must be scar'
+        # self.score = point_data * self.weight
 
 
 def convert_2Dto3D(point_2D, positions_3D):
@@ -72,6 +84,20 @@ def merge_points(points_3D, shape_3D):
     return res
 
 
+def print_point(point):
+    if point.dim == 3:
+        print 'position:{:s}\tprior:{:.2f}\tweight:{:.2f}'.\
+            format(point.pos, point.prior, point.weight)
+    else:
+        print 'position:{:s}\tprior:{:.2f}\tweight shape:{:s}'.\
+            format(str(point.pos),
+                   point.prior,
+                   str(point.weight.shape))
+
+
 def merge_points_2D(points_2D, shape_2D):
     # only used for points in the first layer
-    pass
+    res = []
+    for point in points_2D:
+        res.append(tuple(point.pos[1:]))
+    return list(set(res))
