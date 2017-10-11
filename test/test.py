@@ -18,7 +18,7 @@ def test_all():
 
     net3 = Net(model_def, model_weights, num_classes)
 
-    net3.img_idx = 56
+    net3.img_idx = 36
     assert net3.get_label() == net3.get_prediction(), 'prediction is error'
     cls_idx = net3.get_label()
     # global config
@@ -34,11 +34,17 @@ def test_all():
     center += list(
         get_max_xy(net3._net.blobs[top_blob_name].data[net3.img_idx, cls_idx]))
     start_points = [Point_3D(center, 1)]
-    points = layers.backward(start_points, start_layer_name, isFilter=False)
+    points, scores = layers.backward(
+        start_points, start_layer_name, isFilter=True, debug=True)
 
     shape_2D = (32, 32)
-    pos_2D = merge_points_2D(points, shape_2D)
-    img_path = ''
+    points = threshold_system(points,
+                              scores,
+                              input_shape=shape_2D,
+                              reserve_num_ratio=0.7,
+                              reserve_num=400,
+                              reserve_scores_ratio=0.1)
+    # img_path = ''
     # visualize(img_path, pos_2D, diag_percent=0.1, image_label='cat')
     # print_point(points[0])
 
@@ -46,7 +52,7 @@ def test_all():
     vis_square(net3._net.blobs['data'].data[net3.img_idx].transpose(
         1, 2, 0)[np.newaxis, ...])
     vis_activated_point(
-        net3._net, pos_2D, net3.img_idx, 0.5)
+        net3._net, points, net3.img_idx, 0.5)
 
 
 caffe_init()

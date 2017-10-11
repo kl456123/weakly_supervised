@@ -12,7 +12,6 @@ class Layers(object):
 
 # output point is 2D
     def conv(self, layer_name, points, isFilter=True):
-        # stop()
         layer_info = self.net.get_layer_info(layer_name)
         K = layer_info['kernel_size']
         P = _get(layer_info['pad'], 0)
@@ -43,48 +42,50 @@ class Layers(object):
             conv = weighted_weight * data
             c, h, w = conv.shape
             kdim = h * w
-            score_map = conv.sum(axis=0) + (weighted_bias + point.prior) / kdim
+            per_prior = (weighted_bias + point.prior) / kdim
+            score_map = conv.sum(axis=0) + per_prior
             if isFilter:
                 keep = score_map > 0
             else:
                 keep = score_map > -np.inf
+            score_map = score_map[keep].ravel()
             keep_weight = weighted_weight[:, keep].transpose((1, 0))
             keep_pos = children_pos[keep.ravel()]
             num_keep = keep_pos.shape[0]
-            per_prior = (weighted_bias + point.prior) / kdim
             for i in range(num_keep):
                 per_pos = keep_pos[i]
                 per_weight = keep_weight[i]
                 if not check_is_pad(per_pos, shape[2:]):
-                    res.append(Point_2D(per_pos, per_weight, per_prior))
+                    res.append(Point_2D(per_pos,
+                                        per_weight,
+                                        per_prior, score_map[i]))
 
         return res
 
-    def relu(self, layer_name, points):
-        # stop()
+    def relu(self, layer_name, points, isFilter=True):
         layer_info = self.net.get_layer_info(layer_name)
         negative_slope = _get(layer_info['negative_slope'], 0)
         dim = points[0].dim
         bottom_name = self.net.get_bottom_name(layer_name)
         data = self.net.get_block_data(bottom_name, None, 0)
         # data = self.net._net.blobs[bottom_name].data[self.net.img_idx]
+        res = []
         for point in points:
             pos = point.pos
-            weight = point.weight
             if dim == 2:
                 if len(data.shape) == 1:
-                    weight[np.where(data < 0)] *= negative_slope
+                    point.weight[np.where(data <= 0)] *= negative_slope
                 else:
-                    # stop()
-                    weight[np.where(data[:, int(pos[1]), int(pos[2])] < 0)
-                           ] *= negative_slope
+                    point.weight[np.where(data[:, int(pos[1]), int(pos[2])] <= 0)
+                                 ] *= negative_slope
             else:
-                if data[int(pos[0]), int(pos[1]), int(pos[2])] < 0:
-                    weight *= negative_slope
-        return points
+                if isFilter and data[int(pos[0]), int(pos[1]), int(pos[2])] <= 0:
+                    continue
+                    # point.weight *= negative_slope
+            res.append(point)
+        return res
 
     def pool(self, layer_name, points, isFilter=True):
-        # stop()
         layer_info = self.net.get_layer_info(layer_name)
         K = layer_info['kernel_size']
         S = _get(layer_info.get('stride'), 1)
@@ -97,15 +98,23 @@ class Layers(object):
         bottom_name = self.net._net.bottom_names[layer_name][0]
         # all point_2D must be converted to 3D before passing through pooling layer
         top_points_3D = []
+        FC = 0
+        if np.isnan(points[0].pos[1]):
+            FC = 1
         if points[0].dim == 2:
             for point in points:
-                top_name = self.net._net.top_names[layer_name][0]
-                data = self.net._net.blobs[top_name].data[self.net.img_idx]
-                c, h, w = data.shape
-                num = c * h * w
-                positions_3D = np.array(np.unravel_index(
-                    np.arange(num), data.shape)).T
-                points_3D = convert_2Dto3D(points[0], positions_3D)
+                if FC:
+                    top_name = self.net._net.top_names[layer_name][0]
+                    data = self.net._net.blobs[top_name].data[self.net.img_idx]
+                    c, h, w = data.shape
+                    num = c * h * w
+                    positions_3D = np.array(np.unravel_index(
+                        np.arange(num), data.shape)).T
+                else:
+                    c = len(point.weight)
+                    positions_3D = [(i, int(point.pos[1]), int(
+                        point.pos[2])) for i in range(c)]
+                points_3D = convert_2Dto3D(point, positions_3D)
                 top_points_3D += points_3D
 
         pooling_blob_shape = self.net._net.blobs[bottom_name].data.shape[1:]
@@ -154,9 +163,11 @@ class Layers(object):
                  points,
                  start_layer_name,
                  log=True,
-                 isFilter=True):
+                 isFilter=True,
+                 debug=False):
         all_layer_sequence = self.net.all_layer_sequence
         start_flag = 0
+        scores = None
         for layer_name in reversed(all_layer_sequence):
             if start_layer_name == layer_name:
                 start_flag = 1
@@ -171,32 +182,40 @@ class Layers(object):
             elif layer_type == 'pooling':
                 points = self.pool(layer_name, points, isFilter)
             elif layer_type == 'relu':
-                points = self.relu(layer_name, points)
+                points = self.relu(layer_name, points, isFilter)
             if log:
                 print 'layer_name: {:s},\tnumber: {:d}'\
                     .format(layer_name, len(points))
 
+            if debug:
+                scores = self.get_points_scores(points, layer_name)
                 print 'scores: {:.2f}'.\
-                    format(self.get_points_scores(points, layer_name))
-        return points
+                    format(scores.sum(axis=0))
+        if scores is None:
+            scores = self.get_points_scores(points, layer_name)
+        return points, scores
 
     def get_points_scores(self, points, layer_name):
         bottom_name = self.net._net.bottom_names[layer_name][0]
         data = self.net._net.blobs[bottom_name].data[self.net.img_idx]
         dim = points[0].dim
-        res = 0
+        res = []
         for point in points:
             pos = point.pos
             if dim == 2:
+                stop()
                 if len(data.shape) == 1:
                     score = point.weight * data[0]
                 else:
                     score = point.weight * data[:, int(pos[1]), int(pos[2])]
-                score = score.sum(axis=0)
+                score = score.sum(axis=0) + point.prior
+                # if score < 0:
+                # stop()
             else:
                 score = point.weight * \
                     data[int(pos[0]), int(pos[1]), int(pos[2])]
-            res += score
+            res.append(score)
+        res = np.array(res)
         return res
 
 

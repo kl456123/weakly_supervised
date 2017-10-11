@@ -43,13 +43,15 @@ def test_vggnet():
         ' ') + 1:]
     print image_label
     cls_idx = idx
-    layer = Layers(net)
+    layers = Layers(net)
     prior = 0
     kernel_weight = np.zeros((num_classes,))
     kernel_weight[cls_idx] = 1
     pos = [np.nan, np.nan, np.nan]
     start_points = [Point_2D(pos, kernel_weight, prior)]
-    points = layer.backward(start_points)
+    start_layer_name = 'fc8'
+    points, scores = layers.backward(
+        start_points, start_layer_name, isFilter=False, debug=True)
     print points[0]
     # all_layer_sequence = net.all_layer_sequence
     # points = None
