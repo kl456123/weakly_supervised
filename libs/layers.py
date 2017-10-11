@@ -191,6 +191,11 @@ class Layers(object):
                 scores = self.get_points_scores(points, layer_name)
                 print 'scores: {:.2f}'.\
                     format(scores.sum(axis=0))
+            points, scores = post_filter_points(
+                points,
+                scores,
+                reserve_scores_ratio=0.9,
+                reserve_num=10000)
         if scores is None:
             scores = self.get_points_scores(points, layer_name)
         return points, scores
@@ -203,7 +208,7 @@ class Layers(object):
         for point in points:
             pos = point.pos
             if dim == 2:
-                stop()
+                # stop()
                 if len(data.shape) == 1:
                     score = point.weight * data[0]
                 else:

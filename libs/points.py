@@ -119,9 +119,9 @@ def merge_points_2D(points_2D, shape_2D):
     return list(set(res))
 
 
-def filter_point(points_2D, scores, shape_2D):
+# def filter_point(points_2D, scores, shape_2D):
 
-    pos_2D = merge_points_2D(points_2D, shape_2D)
+    # pos_2D = merge_points_2D(points_2D, shape_2D)
 
 
 def get_least_num(scores, ratio):
@@ -140,7 +140,7 @@ def filter_points_ratio(points, scores, reserve_num_ratio, reserve_num=30, reser
     # stop()
     res = []
     num = len(points)
-    reserve_num = np.minimum(int(num * reserve_num_ratio), reserve_num)
+    reserve_num = np.minimum(int(num * reserve_num_ratio - 1), reserve_num)
     least_num = get_least_num(scores, reserve_scores_ratio)
     reserve_num = np.maximum(reserve_num, least_num)
     sorted_idx = np.argsort(-scores)
@@ -148,7 +148,7 @@ def filter_points_ratio(points, scores, reserve_num_ratio, reserve_num=30, reser
     for idx in sorted_idx:
         res.append(points[idx])
 
-    return res
+    return res, scores[sorted_idx]
 
 
 def filter_negative_points(points, scores):
@@ -162,6 +162,7 @@ def filter_negative_points(points, scores):
 def threshold_system(points, scores, **kwargs):
     # stop()
     # read args
+    assert len(points) == scores.size, 'each point must has its score'
     input_shape = kwargs['input_shape']
     reserve_num = kwargs['reserve_num']
     reserve_num_ratio = kwargs['reserve_num_ratio']
@@ -171,11 +172,11 @@ def threshold_system(points, scores, **kwargs):
 
     # points, scores = filter_negative_points(points, scores)
     # print 'num of positive scores of points: {:d}'.format(len(points))
-    filtered_points = filter_points_ratio(points,
-                                          scores,
-                                          reserve_num_ratio,
-                                          reserve_num,
-                                          reserve_scores_ratio)
+    filtered_points, _ = filter_points_ratio(points,
+                                             scores,
+                                             reserve_num_ratio,
+                                             reserve_num,
+                                             reserve_scores_ratio)
     print 'remain number after reserving the top scores: {:d}'.format(len(filtered_points))
 
     filtered_points = merge_points_2D(
@@ -183,3 +184,19 @@ def threshold_system(points, scores, **kwargs):
     print 'remain number after filtering repeat points: {:d}'.format(len(filtered_points))
 
     return filtered_points
+
+
+def post_filter_points(points, scores, **kwargs):
+    assert len(points) == scores.size, 'each point must has its score'
+    # stop()
+    reserve_scores_ratio = kwargs['reserve_scores_ratio']
+    reserve_num = kwargs['reserve_num']
+    print 'input number: {:d}'.format(len(points))
+    filtered_points, filtered_scores = filter_points_ratio(points,
+                                                           scores,
+                                                           reserve_num_ratio=1,
+                                                           reserve_num=reserve_num,
+                                                           reserve_scores_ratio=reserve_scores_ratio)
+    # points, scores = filter_negative_points(points, scores)
+    # print 'num of positive scores of points: {:d}'.format(len(points))
+    return filtered_points,filtered_scores

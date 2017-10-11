@@ -11,8 +11,10 @@ from libs.utils import *
 
 
 def test_all():
-    model_def = 'model/nin_max_bigger/nin_max_bigger_train_val.prototxt'
-    model_weights = 'model/nin_max_bigger/cifar10_nin_iter_120000.caffemodel'
+    # model_def = 'model/nin_max_bigger/nin_max_bigger_train_val.prototxt'
+    # model_weights = 'model/nin_max_bigger/cifar10_nin_iter_120000.caffemodel'
+    model_def = 'model/nin_max_big/train_val.prototxt'
+    model_weights = 'model/nin_max_big/cifar10_nin_iter_120000.caffemodel'
     num_classes = 10
     classes_name = []
 
