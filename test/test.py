@@ -11,16 +11,16 @@ from libs.utils import *
 
 
 def test_all():
-    # model_def = 'model/nin_max_bigger/nin_max_bigger_train_val.prototxt'
-    # model_weights = 'model/nin_max_bigger/cifar10_nin_iter_120000.caffemodel'
-    model_def = 'model/nin_max_big/train_val.prototxt'
-    model_weights = 'model/nin_max_big/cifar10_nin_iter_120000.caffemodel'
+    model_def = 'model/nin_max_bigger/nin_max_bigger_train_val.prototxt'
+    model_weights = 'model/nin_max_bigger/cifar10_nin_iter_120000.caffemodel'
+    # model_def = 'model/nin_max_big/train_val.prototxt'
+    # model_weights = 'model/nin_max_big/cifar10_nin_iter_120000.caffemodel'
     num_classes = 10
     classes_name = []
 
     net3 = Net(model_def, model_weights, num_classes)
 
-    net3.img_idx = 36
+    net3.img_idx = 0
     assert net3.get_label() == net3.get_prediction(), 'prediction is error'
     cls_idx = net3.get_label()
     # global config

@@ -51,8 +51,19 @@ def test_vggnet():
     start_points = [Point_2D(pos, kernel_weight, prior)]
     start_layer_name = 'fc8'
     points, scores = layers.backward(
-        start_points, start_layer_name, isFilter=False, debug=True)
+        start_points, start_layer_name, isFilter=True, debug=True)
     print points[0]
+    points = threshold_system(points,
+                              scores,
+                              input_shape=input_shape,
+                              reserve_num_ratio=1,
+                              reserve_num=3000,
+                              reserve_scores_ratio=1)
+
+    vis_square(net._net.blobs['data'].data[net.img_idx].transpose(
+        1, 2, 0)[np.newaxis, ...])
+    vis_activated_point(
+        net._net, points, net.img_idx, 0.5)
     # all_layer_sequence = net.all_layer_sequence
     # points = None
     # for layer_name in all_layer_sequence:

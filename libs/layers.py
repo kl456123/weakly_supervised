@@ -44,8 +44,10 @@ class Layers(object):
             kdim = h * w
             per_prior = (weighted_bias + point.prior) / kdim
             score_map = conv.sum(axis=0) + per_prior
+            score_sum = score_map.sum()
+            threshold = score_sum / 10
             if isFilter:
-                keep = score_map > 0
+                keep = score_map > threshold
             else:
                 keep = score_map > -np.inf
             score_map = score_map[keep].ravel()
@@ -126,9 +128,9 @@ class Layers(object):
             c = int(pos[0])
             h = int(pos[1])
             w = int(pos[2])
-            if check_is_pad(pos, pooling_blob_shape):
-                # just used for case that pad!=0
-                continue
+            # if check_is_pad(pos, pooling_blob_shape):
+            # # just used for case that pad!=0
+            # continue
             children_pos = point.get_children_pos(K, S, D=1, P=P)
             data = self.net.get_block_data(
                 bottom_name, children_pos, 0)
@@ -136,9 +138,9 @@ class Layers(object):
             if isFilter and data[c, idx] * point.weight <= 0:
                 # filter
                 continue
-            x, y = np.unravel_index(idx, (K, K))
+            # x, y = np.unravel_index(idx, (K, K))
             point_3D = Point_3D(
-                (c, x + h * S, y + w * S), point.weight, point.prior)
+                children_pos[idx], point.weight, point.prior)
             bottom_points_3D.append(point_3D)
 
         if not skip_merge:
@@ -175,6 +177,8 @@ class Layers(object):
                 continue
             layer_info = self.net.get_layer_info(layer_name)
             layer_type = layer_info['type']
+            # if layer_name == 'conv5_3':
+            # stop()
             if layer_type == 'fc':
                 points = self.fc(layer_name, points)
             elif layer_type == 'conv':
@@ -187,15 +191,14 @@ class Layers(object):
                 print 'layer_name: {:s},\tnumber: {:d}'\
                     .format(layer_name, len(points))
 
+            scores = self.get_points_scores(points, layer_name)
             if debug:
-                scores = self.get_points_scores(points, layer_name)
                 print 'scores: {:.2f}'.\
                     format(scores.sum(axis=0))
             points, scores = post_filter_points(
                 points,
                 scores,
-                reserve_scores_ratio=0.9,
-                reserve_num=10000)
+                max_num=3000)
         if scores is None:
             scores = self.get_points_scores(points, layer_name)
         return points, scores
@@ -205,12 +208,15 @@ class Layers(object):
         data = self.net._net.blobs[bottom_name].data[self.net.img_idx]
         dim = points[0].dim
         res = []
+        FC = False
+        if np.isnan(points[0].pos[1]):
+            FC = True
         for point in points:
             pos = point.pos
             if dim == 2:
                 # stop()
-                if len(data.shape) == 1:
-                    score = point.weight * data[0]
+                if FC:
+                    score = point.weight * data.ravel()
                 else:
                     score = point.weight * data[:, int(pos[1]), int(pos[2])]
                 score = score.sum(axis=0) + point.prior
@@ -218,7 +224,8 @@ class Layers(object):
                 # stop()
             else:
                 score = point.weight * \
-                    data[int(pos[0]), int(pos[1]), int(pos[2])]
+                    data[int(pos[0]), int(pos[1]), int(pos[2])] +\
+                    point.prior
             res.append(score)
         res = np.array(res)
         return res

@@ -29,7 +29,7 @@ class Point(object):
         res = []
         for h in H:
             for w in W:
-                res.append([np.nan, h, w])
+                res.append([pos[0], h, w])
         return np.array(res)
 
 
@@ -40,6 +40,9 @@ class Point_2D(Point):
                                        kernel_weight,
                                        prior,
                                        score)
+        self.dim = 2
+        self.pos = np.array(self.pos).astype(np.float)
+        self.pos[0] = np.nan
 
     # def set_score(self, point_data):
         # assert point_data
@@ -60,6 +63,7 @@ class Point_3D(Point):
                                        weight,
                                        prior,
                                        score)
+        self.dim = 3
 
     # def set_score(self, point_data):
         # assert isinstance(point_data, int) \
@@ -136,13 +140,19 @@ def get_least_num(scores, ratio):
     return i + 1
 
 
-def filter_points_ratio(points, scores, reserve_num_ratio, reserve_num=30, reserve_scores_ratio=0.85):
+def filter_points_ratio(points, scores, reserve_num_ratio=1, reserve_num=5000, reserve_scores_ratio=1, max_num=20000):
     # stop()
     res = []
     num = len(points)
-    reserve_num = np.minimum(int(num * reserve_num_ratio - 1), reserve_num)
-    least_num = get_least_num(scores, reserve_scores_ratio)
+    reserve_num = np.minimum(int(num * reserve_num_ratio), reserve_num)
+    if reserve_scores_ratio < 1:
+        least_num = get_least_num(scores, reserve_scores_ratio)
+    else:
+        least_num = 0
     reserve_num = np.maximum(reserve_num, least_num)
+    reserve_num = np.minimum(max_num, reserve_num)
+    if reserve_num==0:
+        stop()
     sorted_idx = np.argsort(-scores)
     sorted_idx = sorted_idx[:reserve_num]
     for idx in sorted_idx:
@@ -189,14 +199,15 @@ def threshold_system(points, scores, **kwargs):
 def post_filter_points(points, scores, **kwargs):
     assert len(points) == scores.size, 'each point must has its score'
     # stop()
-    reserve_scores_ratio = kwargs['reserve_scores_ratio']
-    reserve_num = kwargs['reserve_num']
+    # reserve_scores_ratio = kwargs['reserve_scores_ratio']
+    # reserve_num = kwargs['reserve_num']
+    max_num = kwargs['max_num']
+    print 'post filter start to prevent from\n large amount of points'
     print 'input number: {:d}'.format(len(points))
     filtered_points, filtered_scores = filter_points_ratio(points,
                                                            scores,
-                                                           reserve_num_ratio=1,
-                                                           reserve_num=reserve_num,
-                                                           reserve_scores_ratio=reserve_scores_ratio)
+                                                           max_num=max_num)
+    print 'remain number: {:d}'.format(len(filtered_points))
     # points, scores = filter_negative_points(points, scores)
     # print 'num of positive scores of points: {:d}'.format(len(points))
-    return filtered_points,filtered_scores
+    return filtered_points, filtered_scores
