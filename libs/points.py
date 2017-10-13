@@ -2,7 +2,7 @@
 # encoding: utf-8
 
 import numpy as np
-from libs.tools import stop
+from libs.tools import stop, feat_map_raw
 
 
 class Point(object):
@@ -17,6 +17,7 @@ class Point(object):
         self.dim = 2 if np.isnan(pos[0]) else 3
         self.prior = prior
         self.score = score
+        self.raw_spatial_pos = None
 
     def get_children_pos(self, K, S=1, D=1, P=0, filter_pad=False):
         pos = self.pos
@@ -87,19 +88,41 @@ def convert_2Dto3D(point_2D, positions_3D):
 def merge_points(points_3D, shape_3D):
     # only used for point_3D
     mask = np.zeros(shape_3D)
-    score = np.zeros(shape_3D)
+    weight = np.zeros(shape_3D)
     prior = np.zeros(shape_3D)
     for point in points_3D:
         coord = tuple(point.pos)
         # if mask[coord] ==0:
         mask[coord] = 1
-        score[coord] += point.weight
+        weight[coord] += point.weight
         prior[coord] += point.prior
     coord = np.nonzero(mask)
     coord = np.array(coord).T
     res = []
     for c, h, w in list(coord):
-        res.append(Point_3D((c, h, w), score[c, h, w], prior[c, h, w]))
+        res.append(Point_3D((c, h, w), weight[c, h, w], prior[c, h, w]))
+
+    return res
+
+
+def merge_points_2D_better(points, shape_2D):
+    feat_num = len(points[0].weight)
+    mask = np.zeros(shape_2D)
+    weight = np.zeros(shape_2D + (feat_num,))
+    prior = np.zeros(shape_2D)
+    # stop()
+    for point in points:
+        pos = point.pos
+        coord = (int(pos[1]), int(pos[2]))
+        # if mask[coord] ==0:
+        mask[coord] = 1
+        weight[coord] += point.weight
+        prior[coord] += point.prior
+    coord = np.nonzero(mask)
+    coord = np.array(coord).T
+    res = []
+    for h, w in list(coord):
+        res.append(Point_2D((np.nan, h, w), weight[h, w], prior[h, w]))
 
     return res
 
@@ -140,7 +163,7 @@ def get_least_num(scores, ratio):
     return i + 1
 
 
-def filter_points_ratio(points, scores, reserve_num_ratio=1, reserve_num=5000, reserve_scores_ratio=1, max_num=20000):
+def filter_points_ratio(points, scores, reserve_num_ratio=1, reserve_num=5000, reserve_scores_ratio=1, max_num=50000):
     # stop()
     res = []
     num = len(points)
@@ -151,8 +174,6 @@ def filter_points_ratio(points, scores, reserve_num_ratio=1, reserve_num=5000, r
         least_num = 0
     reserve_num = np.maximum(reserve_num, least_num)
     reserve_num = np.minimum(max_num, reserve_num)
-    if reserve_num==0:
-        stop()
     sorted_idx = np.argsort(-scores)
     sorted_idx = sorted_idx[:reserve_num]
     for idx in sorted_idx:
@@ -167,6 +188,12 @@ def filter_negative_points(points, scores):
     for idx in keep[0]:
         res.append(points[idx])
     return res, scores[keep]
+
+
+def mapping_points(points, feat_size, raw_size):
+    for point in points:
+        pos = point.pos
+        point.pos[1:] = feat_map_raw(pos[1:], feat_size, raw_size)
 
 
 def threshold_system(points, scores, **kwargs):

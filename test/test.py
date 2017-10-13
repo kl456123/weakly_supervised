@@ -20,9 +20,10 @@ def test_all():
 
     net3 = Net(model_def, model_weights, num_classes)
 
-    net3.img_idx = 0
+    net3.img_idx = 56
     assert net3.get_label() == net3.get_prediction(), 'prediction is error'
     cls_idx = net3.get_label()
+    print cls_idx
     # global config
     net3.display()
     input_shape = (32, 32)
@@ -43,9 +44,9 @@ def test_all():
     points = threshold_system(points,
                               scores,
                               input_shape=shape_2D,
-                              reserve_num_ratio=0.7,
-                              reserve_num=400,
-                              reserve_scores_ratio=0.1)
+                              reserve_num_ratio=1,
+                              reserve_num=1000,
+                              reserve_scores_ratio=1)
     # img_path = ''
     # visualize(img_path, pos_2D, diag_percent=0.1, image_label='cat')
     # print_point(points[0])

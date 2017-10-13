@@ -45,7 +45,7 @@ class Layers(object):
             per_prior = (weighted_bias + point.prior) / kdim
             score_map = conv.sum(axis=0) + per_prior
             score_sum = score_map.sum()
-            threshold = score_sum / 10
+            threshold = score_sum / 9
             if isFilter:
                 keep = score_map > threshold
             else:
@@ -167,6 +167,7 @@ class Layers(object):
                  log=True,
                  isFilter=True,
                  debug=False):
+        max_num = 50000
         all_layer_sequence = self.net.all_layer_sequence
         start_flag = 0
         scores = None
@@ -176,6 +177,9 @@ class Layers(object):
             if not start_flag:
                 continue
             layer_info = self.net.get_layer_info(layer_name)
+            raw_size = self.net._net.blobs['data'].data.shape[2:]
+            bottom_name = self.net._net.bottom_names[layer_name][0]
+            feat_size = self.net._net.blobs[bottom_name].data.shape[2:]
             layer_type = layer_info['type']
             # if layer_name == 'conv5_3':
             # stop()
@@ -188,47 +192,56 @@ class Layers(object):
             elif layer_type == 'relu':
                 points = self.relu(layer_name, points, isFilter)
             if log:
-                print 'layer_name: {:s},\tnumber: {:d}'\
-                    .format(layer_name, len(points))
+                num = len(points)
+                print 'points in the bottom of layer_name: {:s},\tnumber: {:d}'\
+                    .format(layer_name, num)
+                # print 'receptive_field: {:.2f}'.format(self.net.get_rece)
+                if num > max_num:
+                    print 'stop early'
+                    # stop()
+                    break
 
-            scores = self.get_points_scores(points, layer_name)
+            scores = get_points_scores(self.net, points, layer_name)
             if debug:
                 print 'scores: {:.2f}'.\
                     format(scores.sum(axis=0))
-            points, scores = post_filter_points(
-                points,
-                scores,
-                max_num=3000)
-        if scores is None:
-            scores = self.get_points_scores(points, layer_name)
+        #     points, scores = post_filter_points(
+                # points,
+                # scores,
+                # max_num=3000)
+        # if scores is None:
+        # points = merge_points_2D_better(points, feat_size)
+        scores = get_points_scores(self.net, points, layer_name)
+        mapping_points(points, feat_size, raw_size)
         return points, scores
 
-    def get_points_scores(self, points, layer_name):
-        bottom_name = self.net._net.bottom_names[layer_name][0]
-        data = self.net._net.blobs[bottom_name].data[self.net.img_idx]
-        dim = points[0].dim
-        res = []
-        FC = False
-        if np.isnan(points[0].pos[1]):
-            FC = True
-        for point in points:
-            pos = point.pos
-            if dim == 2:
-                # stop()
-                if FC:
-                    score = point.weight * data.ravel()
-                else:
-                    score = point.weight * data[:, int(pos[1]), int(pos[2])]
-                score = score.sum(axis=0) + point.prior
-                # if score < 0:
-                # stop()
+
+def get_points_scores(net, points, layer_name):
+    bottom_name = net._net.bottom_names[layer_name][0]
+    data = net._net.blobs[bottom_name].data[net.img_idx]
+    dim = points[0].dim
+    res = []
+    FC = False
+    if np.isnan(points[0].pos[1]):
+        FC = True
+    for point in points:
+        pos = point.pos
+        if dim == 2:
+            # stop()
+            if FC:
+                score = point.weight * data.ravel()
             else:
-                score = point.weight * \
-                    data[int(pos[0]), int(pos[1]), int(pos[2])] +\
-                    point.prior
-            res.append(score)
-        res = np.array(res)
-        return res
+                score = point.weight * data[:, int(pos[1]), int(pos[2])]
+            score = score.sum(axis=0) + point.prior
+            # if score < 0:
+            # stop()
+        else:
+            score = point.weight * \
+                data[int(pos[0]), int(pos[1]), int(pos[2])] +\
+                point.prior
+        res.append(score)
+    res = np.array(res)
+    return res
 
 
 def check_is_pad(pos, shape):

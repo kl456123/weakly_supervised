@@ -57,8 +57,9 @@ def test_vggnet():
                               scores,
                               input_shape=input_shape,
                               reserve_num_ratio=1,
-                              reserve_num=3000,
-                              reserve_scores_ratio=1)
+                              reserve_num=50000,
+                              reserve_scores_ratio=0,
+                              max_num=50000)
 
     vis_square(net._net.blobs['data'].data[net.img_idx].transpose(
         1, 2, 0)[np.newaxis, ...])
