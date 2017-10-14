@@ -55,7 +55,7 @@ def test_vggnet():
     print points[0]
     points = threshold_system(points,
                               scores,
-                              input_shape=input_shape,
+                              input_shape=input_shape[2:],
                               reserve_num_ratio=1,
                               reserve_num=50000,
                               reserve_scores_ratio=0,

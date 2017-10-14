@@ -87,7 +87,50 @@ class Layers(object):
             res.append(point)
         return res
 
+    def pool_faster(self, layer_name, points, isFilter=True):
+        layer_info = self.net.get_layer_info(layer_name)
+        K = layer_info['kernel_size']
+        S = _get(layer_info.get('stride'), 1)
+        P = _get(layer_info.get('pad'), 0)
+        dim = points[0].dim
+        FC = 0
+        if np.isnan(points[0].pos[1]):
+            FC = 1
+        bottom_name = self.net._net.bottom_names[layer_name][0]
+        bottom_data = self.net._net.blobs[bottom_name].data[self.net.img_idx]
+        mask = get_pool_mask(bottom_data, K, S, P)
+        weight = np.zeros(mask.shape[:-1])
+        prior = np.zeros_like(weight)
+        res = []
+        num = mask.shape[0]
+        # stop()
+        for point in points:
+            #         if dim == 2:
+                # if FC:
+                    # pass
+                # else:
+                    # pass
+            # else:
+                # pass
+            pos = point.pos
+            # children_pos = mask[:, int(pos[1]), int(pos[2])]
+            per_prior = point.prior / num
+            for i in range(num):
+                if isFilter and point.weight[i] <= 0:
+                    continue
+                weight[i, int(pos[1]), int(pos[2])] += point.weight[i]
+                prior[i, int(pos[1]), int(pos[2])] += per_prior
+                # res.append(
+                # Point_3D(children_pos[i], point.weight[i], per_prior))
+        keep = list(np.array(np.nonzero(weight)).T)
+        for c, h, w in keep:
+            res.append(
+                Point_3D(mask[c, h, w], weight[c, h, w], prior[c, h, w]))
+
+        return res
+
     def pool(self, layer_name, points, isFilter=True):
+        # stop()
         layer_info = self.net.get_layer_info(layer_name)
         K = layer_info['kernel_size']
         S = _get(layer_info.get('stride'), 1)
@@ -103,6 +146,8 @@ class Layers(object):
         FC = 0
         if np.isnan(points[0].pos[1]):
             FC = 1
+        import time
+        start_pool = time.time()
         if points[0].dim == 2:
             for point in points:
                 if FC:
@@ -118,9 +163,14 @@ class Layers(object):
                         point.pos[2])) for i in range(c)]
                 points_3D = convert_2Dto3D(point, positions_3D)
                 top_points_3D += points_3D
+        convert_time = time.time()
+        print 'convert_time :{:.5f}'.format(convert_time - start_pool)
 
         pooling_blob_shape = self.net._net.blobs[bottom_name].data.shape[1:]
         for point in top_points_3D:
+            if isFilter and point.weight <= 0:
+                # filter
+                continue
             assert point.dim == 3, 'all points must be converted to 3D first'
             # 3D
             # just one child
@@ -135,13 +185,14 @@ class Layers(object):
             data = self.net.get_block_data(
                 bottom_name, children_pos, 0)
             idx = np.argmax(data[c], axis=0)
-            if isFilter and data[c, idx] * point.weight <= 0:
-                # filter
-                continue
+
             # x, y = np.unravel_index(idx, (K, K))
-            point_3D = Point_3D(
-                children_pos[idx], point.weight, point.prior)
-            bottom_points_3D.append(point_3D)
+            point.pos = children_pos[idx]
+            # point_3D = Point_3D(
+            # children_pos[idx], point.weight, point.prior)
+            bottom_points_3D.append(point)
+        filter_time = time.time()
+        print 'filter time:{:.5f}'.format(filter_time - convert_time)
 
         if not skip_merge:
             bottom_points_3D = merge_points(
@@ -167,11 +218,14 @@ class Layers(object):
                  log=True,
                  isFilter=True,
                  debug=False):
+        import time
         max_num = 50000
         all_layer_sequence = self.net.all_layer_sequence
         start_flag = 0
         scores = None
+        backward_start_time = time.time()
         for layer_name in reversed(all_layer_sequence):
+            start_num = len(points)
             if start_layer_name == layer_name:
                 start_flag = 1
             if not start_flag:
@@ -183,23 +237,25 @@ class Layers(object):
             layer_type = layer_info['type']
             # if layer_name == 'conv5_3':
             # stop()
+            start_time = time.time()
             if layer_type == 'fc':
                 points = self.fc(layer_name, points)
             elif layer_type == 'conv':
                 points = self.conv(layer_name, points, isFilter)
             elif layer_type == 'pooling':
-                points = self.pool(layer_name, points, isFilter)
+                points = self.pool_faster(layer_name, points, isFilter)
             elif layer_type == 'relu':
                 points = self.relu(layer_name, points, isFilter)
+            dura_time = time.time() - start_time
             if log:
                 num = len(points)
-                print 'points in the bottom of layer_name: {:s},\tnumber: {:d}'\
-                    .format(layer_name, num)
+                print 'INFO: {:s},\tnumber: {:d}\tdura_time: {:.4f},\ttime_per_point: {:.4f}'\
+                    .format(layer_name, num, dura_time, dura_time / start_num)
                 # print 'receptive_field: {:.2f}'.format(self.net.get_rece)
-                if num > max_num:
-                    print 'stop early'
-                    # stop()
-                    break
+                # if num > max_num:
+                    # print 'stop early'
+                    # # stop()
+                    # break
 
             scores = get_points_scores(self.net, points, layer_name)
             if debug:
@@ -211,6 +267,8 @@ class Layers(object):
                 # max_num=3000)
         # if scores is None:
         # points = merge_points_2D_better(points, feat_size)
+        backward_dura_time = time.time() - backward_start_time
+        print 'backward duration: {:.3f}'.format(backward_dura_time)
         scores = get_points_scores(self.net, points, layer_name)
         mapping_points(points, feat_size, raw_size)
         return points, scores
@@ -251,3 +309,22 @@ def check_is_pad(pos, shape):
     if pos[2] < 0 or pos[2] >= shape[1]:
         return True
     return False
+
+
+def get_pool_mask(data, K, S, P=0):
+    c, h, w = data.shape
+    data_ = np.zeros((c, h, w))
+
+    w_next = (w - K + 2 * P) / S + 1
+    for i in range(w_next):
+        for j in range(w_next):
+            x = (S * i, S * i + K)
+            y = (S * j, S * j + K)
+            if P == 0:
+                mask = np.unravel_index(
+                    np.argmax(data[:, x[0]:x[1], y[0]:y[1]].reshape((c, -1)), axis=1), (K, K))
+                data_[np.arange(c), mask[0] + x[0], mask[1] + y[0]] = 1
+            else:
+                raise NotImplementedError
+
+    return np.array(np.nonzero(data_)).T.reshape((c, w_next, w_next, 3))

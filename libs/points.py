@@ -105,6 +105,13 @@ def merge_points(points_3D, shape_3D):
     return res
 
 
+def merge_analog_2D(points):
+    pos = points[0].pos
+    for point in points:
+        assert (pos[1:] == point.pos[1:]).all(
+        ), 'points must be in the same pos'
+
+
 def merge_points_2D_better(points, shape_2D):
     feat_num = len(points[0].weight)
     mask = np.zeros(shape_2D)
@@ -141,7 +148,18 @@ def print_point(point):
 def merge_points_2D(points_2D, shape_2D):
     # only used for points in the first layer
     res = []
+    # feat_num = points_2D[0].weight.size
+    # stop()
+    # mark = np.zeros(shape_2D)
+    # weight = np.zeros(shape_2D + (feat_num,))
     for point in points_2D:
+        # coord = tuple(point.pos[1:].astype(np.int))
+        # if mark[coord] == 0:
+            # mark[coord] = 1
+            # weight[coord] += point.weight
+        # else:
+            # stop()
+
         res.append(tuple(point.pos[1:]))
     return list(set(res))
 
@@ -171,7 +189,7 @@ def filter_points_ratio(points, scores, reserve_num_ratio=1, reserve_num=5000, r
     if reserve_scores_ratio < 1:
         least_num = get_least_num(scores, reserve_scores_ratio)
     else:
-        least_num = 0
+        least_num = num
     reserve_num = np.maximum(reserve_num, least_num)
     reserve_num = np.minimum(max_num, reserve_num)
     sorted_idx = np.argsort(-scores)

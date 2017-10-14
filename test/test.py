@@ -11,16 +11,16 @@ from libs.utils import *
 
 
 def test_all():
-    model_def = 'model/nin_max_bigger/nin_max_bigger_train_val.prototxt'
-    model_weights = 'model/nin_max_bigger/cifar10_nin_iter_120000.caffemodel'
-    # model_def = 'model/nin_max_big/train_val.prototxt'
-    # model_weights = 'model/nin_max_big/cifar10_nin_iter_120000.caffemodel'
+    # model_def = 'model/nin_max_bigger/nin_max_bigger_train_val.prototxt'
+    # model_weights = 'model/nin_max_bigger/cifar10_nin_iter_120000.caffemodel'
+    model_def = 'model/nin_max_big/train_val.prototxt'
+    model_weights = 'model/nin_max_big/cifar10_nin_iter_120000.caffemodel'
     num_classes = 10
     classes_name = []
 
     net3 = Net(model_def, model_weights, num_classes)
 
-    net3.img_idx = 56
+    net3.img_idx = 0
     assert net3.get_label() == net3.get_prediction(), 'prediction is error'
     cls_idx = net3.get_label()
     print cls_idx
@@ -38,7 +38,7 @@ def test_all():
         get_max_xy(net3._net.blobs[top_blob_name].data[net3.img_idx, cls_idx]))
     start_points = [Point_3D(center, 1)]
     points, scores = layers.backward(
-        start_points, start_layer_name, isFilter=True, debug=True)
+        start_points, start_layer_name, isFilter=False, debug=True)
 
     shape_2D = (32, 32)
     points = threshold_system(points,
@@ -46,7 +46,7 @@ def test_all():
                               input_shape=shape_2D,
                               reserve_num_ratio=1,
                               reserve_num=1000,
-                              reserve_scores_ratio=1)
+                              reserve_scores_ratio=0.9)
     # img_path = ''
     # visualize(img_path, pos_2D, diag_percent=0.1, image_label='cat')
     # print_point(points[0])
