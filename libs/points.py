@@ -256,3 +256,35 @@ def post_filter_points(points, scores, **kwargs):
     # points, scores = filter_negative_points(points, scores)
     # print 'num of positive scores of points: {:d}'.format(len(points))
     return filtered_points, filtered_scores
+
+
+def cluster_points(points, threshold):
+    # used for 2D points
+    pos = points[0].pos
+    num = len(points)
+    pos_arr = np.zeros(num, points.weight.size)
+    for i, point in enumerate(points):
+        dim = points[0].dim
+        assert dim == 2, 'points must be 2D'
+        pos_arr[i] = point.weight
+    norm = np.linalg.norm(pos_arr, axis=1)
+    pos_arr = pos_arr / norm
+    # matrix = np.dot(pos_arr, pos_arr.T)
+    # matrix>threshold
+    used = np.zeros((num,))
+    res = []
+    for i in range(num):
+        if used[i]:
+            continue
+        used[i] = 1
+        weight = pos_arr[i] * norm[i]
+        prior = points[i].prior
+        for j in range(i):
+            if used[j]:
+                continue
+            if pos_arr[i] * pos_arr[j] > threshold:
+                used[j] = 1
+                weight += pos_arr[j] * norm[j]
+                prior += points[j].prior
+        res.append(Point_2D(points[i].pos, weight, prior))
+    return res

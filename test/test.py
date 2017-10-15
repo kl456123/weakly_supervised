@@ -38,7 +38,7 @@ def test_all():
         get_max_xy(net3._net.blobs[top_blob_name].data[net3.img_idx, cls_idx]))
     start_points = [Point_3D(center, 1)]
     points, scores = layers.backward(
-        start_points, start_layer_name, isFilter=False, debug=True)
+        start_points, start_layer_name, isFilter=True, debug=True)
 
     shape_2D = (32, 32)
     points = threshold_system(points,
