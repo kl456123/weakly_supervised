@@ -11,7 +11,12 @@ class Layers(object):
         self.net = net
 
 # output point is 2D
-    def conv(self, layer_name, points, isFilter=True):
+    def conv(self,
+             layer_name,
+             points,
+             isFilter=True,
+             PART_TEST=False,
+             test_part_pos=None):
         layer_info = self.net.get_layer_info(layer_name)
         K = layer_info['kernel_size']
         P = _get(layer_info['pad'], 0)
@@ -50,6 +55,10 @@ class Layers(object):
                 keep = score_map > threshold
             else:
                 keep = score_map > -np.inf
+            if PART_TEST:
+                keep[...] = False
+                part_pos = test_part_pos
+                keep[part_pos] = True
             score_map = score_map[keep].ravel()
             keep_weight = weighted_weight[:, keep].transpose((1, 0))
             keep_pos = children_pos[keep.ravel()]
@@ -100,12 +109,21 @@ class Layers(object):
         bottom_data = self.net._net.blobs[bottom_name].data[self.net.img_idx]
         top_name = self.net._net.top_names[layer_name][0]
         top_data = self.net._net.blobs[top_name].data[self.net.img_idx]
+<<<<<<< HEAD
+        if K == 0:
+            K = bottom_data.shape[1]
+=======
+>>>>>>> c0c2e9da4ea73af6491416ae43eaaa09baf9e1da
         top_shape = top_data.shape
         mask = get_pool_mask(bottom_data, K, S, P)
         weight = np.zeros(mask.shape[:-1])
         prior = np.zeros_like(weight)
         res = []
+<<<<<<< HEAD
+        num = points[0].weight.size
+=======
         num = mask.shape[0]
+>>>>>>> c0c2e9da4ea73af6491416ae43eaaa09baf9e1da
         assert dim == 2, 'dim ==3 is not supported'
         for point in points:
             #         if dim == 2:
@@ -229,7 +247,9 @@ class Layers(object):
                  start_layer_name,
                  log=True,
                  isFilter=True,
-                 debug=False):
+                 debug=False,
+                 test_flag=0,
+                 test_part_pos=None):
         import time
         max_num = 50000
         all_layer_sequence = self.net.all_layer_sequence
@@ -237,8 +257,13 @@ class Layers(object):
         scores = None
         backward_start_time = time.time()
         raw_size = self.net._net.blobs['data'].data.shape[2:]
+<<<<<<< HEAD
+        # test_flag = 1
+=======
+>>>>>>> c0c2e9da4ea73af6491416ae43eaaa09baf9e1da
         for layer_name in reversed(all_layer_sequence):
             start_num = len(points)
+
             if start_layer_name == layer_name:
                 start_flag = 1
             if not start_flag:
@@ -252,12 +277,32 @@ class Layers(object):
             if layer_type == 'fc':
                 points = self.fc(layer_name, points)
             elif layer_type == 'conv':
-                points = self.conv(layer_name, points, isFilter)
+                if test_flag:
+                    test_flag -= 1
+                    PART_TEST = True
+                else:
+                    PART_TEST = False
+                points = self.conv(layer_name,
+                                   points,
+                                   isFilter,
+                                   PART_TEST,
+                                   test_part_pos)
             elif layer_type == 'pooling':
+                # self.visualization_vggnet(layer_name, points)
                 points = self.pool_faster(layer_name, points, isFilter)
             elif layer_type == 'relu':
                 points = self.relu(layer_name, points, isFilter)
             dura_time = time.time() - start_time
+            if len(points) == 0:
+                return points, None
+            scores = get_points_scores(self.net, points, layer_name)
+            if debug:
+                print 'scores: {:.2f}'.\
+                    format(scores.sum(axis=0))
+            # if scores <= 0:
+                # stop()
+                # return [], scores
+            points = helper_cluster_points(points, feat_size, threshold=0)
             if log:
                 num = len(points)
                 print 'INFO: {:s},\tnumber: {:d}\tdura_time: {:.4f},\ttime_per_point: {:.4f}'\
@@ -267,6 +312,12 @@ class Layers(object):
                 # print 'stop early'
                 # # stop()
                 # break
+<<<<<<< HEAD
+        #     points, scores = post_filter_points(
+            # points,
+            # scores,
+            # max_num=3000)
+=======
 
             scores = get_points_scores(self.net, points, layer_name)
             if debug:
@@ -276,6 +327,7 @@ class Layers(object):
                 points,
                 scores,
                 max_num=3000)
+>>>>>>> c0c2e9da4ea73af6491416ae43eaaa09baf9e1da
         # if scores is None:
         # points = merge_points_2D_better(points, feat_size)
         backward_dura_time = time.time() - backward_start_time
@@ -283,6 +335,17 @@ class Layers(object):
         scores = get_points_scores(self.net, points, layer_name)
         mapping_points(points, feat_size, raw_size)
         return points, scores
+
+    def visualization_vggnet(self, layer_name, points):
+        import matplotlib.pyplot as plt
+        assert len(points) == 1, 'top layer must be fc'
+        point = points[0]
+        top_name = self.net._net.top_names[layer_name][0]
+        top_data = self.net._net.blobs[top_name].data[self.net.img_idx]
+        weight = point.weight.reshape(top_data.shape)
+        CAM = (top_data * weight).sum(axis=0)
+        plt.imshow(CAM)
+        plt.show()
 
 
 def get_points_scores(net, points, layer_name):

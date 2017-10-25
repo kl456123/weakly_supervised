@@ -110,7 +110,7 @@ def caffe_init(mode='gpu'):
         caffe.set_mode_cpu()
 
 
-def vis_activated_point(net, activated_points, img_idx, pixel_val=0.5):
+def vis_activated_point(net, activated_points, img_idx, pixel_val=0.5, save=False):
     # import pdb
     # pdb.set_trace()
     #     note that activated points is 2D (h,w)
@@ -140,7 +140,9 @@ def vis_activated_point(net, activated_points, img_idx, pixel_val=0.5):
         print('no activated points!!')
         return
     else:
-        vis_square(_data)
+        dirty_data = vis_square(_data)
+        if save:
+            plt.imsave('dirty_data.png', dirty_data)
 
 
 def get_feat_by_kernel_spatial_idx(layer_name,
@@ -652,7 +654,7 @@ def parse_net_proto(prototxt):
     # from collections import OrderedDict
     # net_param = caffe_pb2.NetParameter()
     # with open(prototxt, 'r') as f:
-        # Merge(f.read(), net_param)
+    # Merge(f.read(), net_param)
     # layer_names = []
     # all_layer_info = OrderedDict()
     # # store fc layer
@@ -660,55 +662,55 @@ def parse_net_proto(prototxt):
     # negative_slope = None
     # is_bn = 0
     # for layer in net_param.layer:
-        # layer_name = layer.name
-        # one_layer_info = {}
-        # # one_layer_info['ps'] = layer.
-        # if layer.type == 'Pooling':
-            # param = layer.pooling_param
-            # # pooling_param  = caffe_pb2.PoolingParameter()
-            # one_layer_info['pooling'] = 'max' if param.pool == 0 else 'ave'
+    # layer_name = layer.name
+    # one_layer_info = {}
+    # # one_layer_info['ps'] = layer.
+    # if layer.type == 'Pooling':
+    # param = layer.pooling_param
+    # # pooling_param  = caffe_pb2.PoolingParameter()
+    # one_layer_info['pooling'] = 'max' if param.pool == 0 else 'ave'
 
-            # # default value for Pooling layer
-            # # note that Pooling layer don't support ps operation
-            # one_layer_info['ps'] = False
-            # one_layer_info['bn'] = False
-            # one_layer_info['dilation'] = 1
-        # elif layer.type == 'Convolution':
-            # param = layer.convolution_param
-            # one_layer_info['ps'] = help_parse(param.position_sensetive, 'ps')
-            # one_layer_info['dilation'] = help_parse(param.dilation, 'dilation')
-            # one_layer_info['bn'] = False
-        # elif layer.type == 'ReLU':
-            # negative_slope = help_parse(
-                # layer.relu_param.negative_slope, 'negative_slope')
-            # continue
-        # elif layer.type == 'BatchNorm' or layer.type == 'Scale':
-            # is_bn += 1
-            # continue
-        # elif layer.type == 'InnerProduct':
-            # param = layer.inner_product_param
-            # one_layer_info['num_output'] = param.num_output
-            # one_layer_info['negative_slope'] = 1
-            # one_layer_info['bn'] = False
-            # # pad is for the bottom blob here
-            # one_layer_info['pad'] = 0
-        # else:
-            # print 'skip layer {:s}'.format(layer.name)
-            # continue
-        # if negative_slope is not None:
-            # one_layer_info['negative_slope'] = negative_slope
-            # negative_slope = None
-        # if is_bn == 2:
-            # all_layer_info[layer_names[-1]]['bn'] = True
-            # is_bn = 0
-        # if layer.type == 'InnerProduct':
-            # auxiliary_info[layer_name] = one_layer_info
-            # continue
-        # one_layer_info['kernel_size'] = help_parse(param.kernel_size, None)
-        # one_layer_info['pad'] = help_parse(param.pad, 'pad')
-        # one_layer_info['stride'] = help_parse(param.stride, 'stride')
-        # layer_names.append(layer_name)
-        # all_layer_info[layer_name] = one_layer_info
+    # # default value for Pooling layer
+    # # note that Pooling layer don't support ps operation
+    # one_layer_info['ps'] = False
+    # one_layer_info['bn'] = False
+    # one_layer_info['dilation'] = 1
+    # elif layer.type == 'Convolution':
+    # param = layer.convolution_param
+    # one_layer_info['ps'] = help_parse(param.position_sensetive, 'ps')
+    # one_layer_info['dilation'] = help_parse(param.dilation, 'dilation')
+    # one_layer_info['bn'] = False
+    # elif layer.type == 'ReLU':
+    # negative_slope = help_parse(
+    # layer.relu_param.negative_slope, 'negative_slope')
+    # continue
+    # elif layer.type == 'BatchNorm' or layer.type == 'Scale':
+    # is_bn += 1
+    # continue
+    # elif layer.type == 'InnerProduct':
+    # param = layer.inner_product_param
+    # one_layer_info['num_output'] = param.num_output
+    # one_layer_info['negative_slope'] = 1
+    # one_layer_info['bn'] = False
+    # # pad is for the bottom blob here
+    # one_layer_info['pad'] = 0
+    # else:
+    # print 'skip layer {:s}'.format(layer.name)
+    # continue
+    # if negative_slope is not None:
+    # one_layer_info['negative_slope'] = negative_slope
+    # negative_slope = None
+    # if is_bn == 2:
+    # all_layer_info[layer_names[-1]]['bn'] = True
+    # is_bn = 0
+    # if layer.type == 'InnerProduct':
+    # auxiliary_info[layer_name] = one_layer_info
+    # continue
+    # one_layer_info['kernel_size'] = help_parse(param.kernel_size, None)
+    # one_layer_info['pad'] = help_parse(param.pad, 'pad')
+    # one_layer_info['stride'] = help_parse(param.stride, 'stride')
+    # layer_names.append(layer_name)
+    # all_layer_info[layer_name] = one_layer_info
     # all_layer_info[layer_names[-1]]['bn'] = False
     # return all_layer_info, auxiliary_info
 
@@ -771,3 +773,7 @@ def display(net):
 
 def get_featmap_size():
     pass
+
+
+def calculate_similarity(a, b):
+    return (a * b).sum() / (np.linalg.norm(a) * np.linalg.norm(b))

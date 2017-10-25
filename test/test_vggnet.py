@@ -23,7 +23,7 @@ model_weights = 'model/vgg16/VGG_ILSVRC_16_layers.caffemodel'
 def test_vggnet():
     num_classes = 1000
     net = Net(model_def, model_weights, num_classes, deploy=True)
-    image_file = 'image/cat.jpg'
+    image_file = 'image/dog.jpg'
     mean_file = 'model/ilsvrc_2012_mean.npy'
     # mu = np.load(mean_file)
     input_shape = net._net.blobs['data'].data.shape

@@ -262,13 +262,23 @@ def cluster_points(points, threshold):
     # used for 2D points
     pos = points[0].pos
     num = len(points)
+<<<<<<< HEAD
+    pos_arr = np.zeros((num, points[0].weight.size))
+=======
     pos_arr = np.zeros(num, points.weight.size)
+>>>>>>> c0c2e9da4ea73af6491416ae43eaaa09baf9e1da
     for i, point in enumerate(points):
         dim = points[0].dim
         assert dim == 2, 'points must be 2D'
         pos_arr[i] = point.weight
     norm = np.linalg.norm(pos_arr, axis=1)
+<<<<<<< HEAD
+    if norm[norm == 0].size > 0:
+        stop()
+    pos_arr = pos_arr / norm[..., np.newaxis]
+=======
     pos_arr = pos_arr / norm
+>>>>>>> c0c2e9da4ea73af6491416ae43eaaa09baf9e1da
     # matrix = np.dot(pos_arr, pos_arr.T)
     # matrix>threshold
     used = np.zeros((num,))
@@ -279,6 +289,42 @@ def cluster_points(points, threshold):
         used[i] = 1
         weight = pos_arr[i] * norm[i]
         prior = points[i].prior
+<<<<<<< HEAD
+        for j in range(num - i - 1):
+            idx = i + j + 1
+            if used[idx]:
+                continue
+            if (pos_arr[i] * pos_arr[idx]).sum(axis=0) > threshold:
+                used[idx] = 1
+                weight += pos_arr[idx] * norm[idx]
+                prior += points[idx].prior
+        res.append(Point_2D(points[i].pos, weight, prior))
+    return res
+
+
+# for 2D points
+def helper_cluster_points(points, shape_2D, threshold=0.8):
+    # build idx for points in each pos
+    if points[0].dim == 3 or np.isnan(points[0].pos[2]):
+        return points
+    # stop()
+    dict_points = {}
+    h = shape_2D[0]
+    w = shape_2D[1]
+    for point in points:
+        hash_pos = str(point.pos[1] * w + point.pos[2])
+        if hash_pos not in dict_points:
+            dict_points[hash_pos] = []
+        dict_points[hash_pos].append(point)
+    res = []
+    min_num = 1
+    for fixed_points in dict_points.values():
+        if len(fixed_points) <= min_num:
+            res += fixed_points
+        else:
+            res += cluster_points(fixed_points, threshold)
+    return res
+=======
         for j in range(i):
             if used[j]:
                 continue
@@ -288,3 +334,4 @@ def cluster_points(points, threshold):
                 prior += points[j].prior
         res.append(Point_2D(points[i].pos, weight, prior))
     return res
+>>>>>>> c0c2e9da4ea73af6491416ae43eaaa09baf9e1da
