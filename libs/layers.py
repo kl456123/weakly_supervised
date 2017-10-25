@@ -109,21 +109,15 @@ class Layers(object):
         bottom_data = self.net._net.blobs[bottom_name].data[self.net.img_idx]
         top_name = self.net._net.top_names[layer_name][0]
         top_data = self.net._net.blobs[top_name].data[self.net.img_idx]
-<<<<<<< HEAD
+
         if K == 0:
             K = bottom_data.shape[1]
-=======
->>>>>>> c0c2e9da4ea73af6491416ae43eaaa09baf9e1da
         top_shape = top_data.shape
         mask = get_pool_mask(bottom_data, K, S, P)
         weight = np.zeros(mask.shape[:-1])
         prior = np.zeros_like(weight)
         res = []
-<<<<<<< HEAD
         num = points[0].weight.size
-=======
-        num = mask.shape[0]
->>>>>>> c0c2e9da4ea73af6491416ae43eaaa09baf9e1da
         assert dim == 2, 'dim ==3 is not supported'
         for point in points:
             #         if dim == 2:
@@ -257,10 +251,7 @@ class Layers(object):
         scores = None
         backward_start_time = time.time()
         raw_size = self.net._net.blobs['data'].data.shape[2:]
-<<<<<<< HEAD
         # test_flag = 1
-=======
->>>>>>> c0c2e9da4ea73af6491416ae43eaaa09baf9e1da
         for layer_name in reversed(all_layer_sequence):
             start_num = len(points)
 
@@ -312,22 +303,10 @@ class Layers(object):
                 # print 'stop early'
                 # # stop()
                 # break
-<<<<<<< HEAD
         #     points, scores = post_filter_points(
             # points,
             # scores,
             # max_num=3000)
-=======
-
-            scores = get_points_scores(self.net, points, layer_name)
-            if debug:
-                print 'scores: {:.2f}'.\
-                    format(scores.sum(axis=0))
-            points, scores = post_filter_points(
-                points,
-                scores,
-                max_num=3000)
->>>>>>> c0c2e9da4ea73af6491416ae43eaaa09baf9e1da
         # if scores is None:
         # points = merge_points_2D_better(points, feat_size)
         backward_dura_time = time.time() - backward_start_time

@@ -262,23 +262,15 @@ def cluster_points(points, threshold):
     # used for 2D points
     pos = points[0].pos
     num = len(points)
-<<<<<<< HEAD
     pos_arr = np.zeros((num, points[0].weight.size))
-=======
-    pos_arr = np.zeros(num, points.weight.size)
->>>>>>> c0c2e9da4ea73af6491416ae43eaaa09baf9e1da
     for i, point in enumerate(points):
         dim = points[0].dim
         assert dim == 2, 'points must be 2D'
         pos_arr[i] = point.weight
     norm = np.linalg.norm(pos_arr, axis=1)
-<<<<<<< HEAD
     if norm[norm == 0].size > 0:
         stop()
     pos_arr = pos_arr / norm[..., np.newaxis]
-=======
-    pos_arr = pos_arr / norm
->>>>>>> c0c2e9da4ea73af6491416ae43eaaa09baf9e1da
     # matrix = np.dot(pos_arr, pos_arr.T)
     # matrix>threshold
     used = np.zeros((num,))
@@ -289,7 +281,6 @@ def cluster_points(points, threshold):
         used[i] = 1
         weight = pos_arr[i] * norm[i]
         prior = points[i].prior
-<<<<<<< HEAD
         for j in range(num - i - 1):
             idx = i + j + 1
             if used[idx]:
@@ -324,14 +315,3 @@ def helper_cluster_points(points, shape_2D, threshold=0.8):
         else:
             res += cluster_points(fixed_points, threshold)
     return res
-=======
-        for j in range(i):
-            if used[j]:
-                continue
-            if pos_arr[i] * pos_arr[j] > threshold:
-                used[j] = 1
-                weight += pos_arr[j] * norm[j]
-                prior += points[j].prior
-        res.append(Point_2D(points[i].pos, weight, prior))
-    return res
->>>>>>> c0c2e9da4ea73af6491416ae43eaaa09baf9e1da

@@ -7,7 +7,6 @@ from libs.tools import *
 import numpy as np
 from libs.layers import Layers
 from libs.points import *
-from libs.utils import *
 
 
 def test_part(class_idx, part_pos):
