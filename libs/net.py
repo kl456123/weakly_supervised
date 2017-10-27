@@ -3,7 +3,8 @@
 import numpy as np
 import caffe
 import os
-from tools import *
+# from tools import *
+from libs.tools import *
 
 
 class Net(object):
@@ -93,13 +94,13 @@ class Net(object):
         # top blob info is in the top of layer
         layer_name = self.get_parent_layer_name(current_layer_name)
         if layer_name is None:
-            print 'no parent exist ,may be the top layer'
+            print('no parent exist ,may be the top layer')
             return None
         return self.get_layer_info(layer_name)
 
     def display(self):
         for layer_name, blob in self._net.blobs.iteritems():
-            print layer_name + '\t' + str(blob.data.shape)
+            print(layer_name + '\t' + str(blob.data.shape))
 
     def set_img_idx(self, img_idx):
         batch_size = self.get_batch_size()
@@ -125,7 +126,7 @@ class Net(object):
         if layer_name in self.layer_sequence:
             return self._layer_info[layer_name]
         else:
-            print '{:s} is scale layer,return None'.format(layer_name)
+            print('{:s} is scale layer,return None'.format(layer_name))
             return None
 
     def get_blobs_name_by_idx(self, id):

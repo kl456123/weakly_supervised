@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 import sys
-# sys.path.append('..')
+sys.path.append('/home/jinshan/Documents/papercode/weakly_supervised/')
 from libs.net import Net
 from libs.tools import *
 import numpy as np
@@ -91,7 +91,7 @@ def test_all():
     net3.img_idx = 15
     assert net3.get_label() == net3.get_prediction(), 'prediction is error'
     cls_idx = net3.get_label()
-    print cls_idx
+    print(cls_idx)
     # global config
     net3.display()
     input_shape = (32, 32)
@@ -155,7 +155,7 @@ def test_demo(image_file):
     net3.img_idx = 0
     # assert net3.get_label() == net3.get_prediction(), 'prediction is error'
     cls_idx = net3.get_prediction()
-    print cls_idx
+    print(cls_idx)
     # global config
     net3.display()
     input_shape = (32, 32)
@@ -191,7 +191,7 @@ def test_demo(image_file):
         net3._net, points, net3.img_idx, 0.5)
 
 
-caffe_init()
+# caffe_init()
 # test_all()
 # test_demo('dirty_data.png')
-test_part(2, (1, 2))
+test_part(9, (0,2))

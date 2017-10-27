@@ -338,8 +338,8 @@ def help_draw_detection(data, raw_spatial_position, receptive_field, display=Tru
 
 def receptive_top2down(top_receptive_field, stride, kernel_size, dilation):
     if kernel_size == 0:
-        print 'warn: may be global pooling is set true\
-        so receptive_field is global(just return None)'
+        print('warn: may be global pooling is set true\
+        so receptive_field is global(just return None)')
         return 0
     kernel_extent = (kernel_size - 1) * (dilation - 1) + kernel_size
     return (top_receptive_field - 1) * stride + kernel_extent
@@ -404,8 +404,8 @@ def top_down(top_part_object_scores,
         part_object_scores = queue[0]
         if display and part_object_scores._layer_name != last_layer_name:
             if last_layer_name != '':
-                print 'layer_name: {:s},\treceptive_field:{:.2f},\t number: {:d}'\
-                    .format(last_layer_name, last_receptive_field, len(queue) - 1)
+                print('layer_name: {:s},\treceptive_field:{:.2f},\t number: {:d}'
+                      .format(last_layer_name, last_receptive_field, len(queue) - 1))
             last_layer_name = part_object_scores._layer_name
             last_receptive_field = part_object_scores.receptive_field
 
@@ -435,8 +435,8 @@ def top_down(top_part_object_scores,
         queue += filter_part_object_scores(
             all_next_part_object_scores, keep[0])
     if display:
-        print 'layer_name: {:s},\treceptive_field:{:.2f},\t number: {:d}'\
-            .format(last_layer_name, last_receptive_field, len(res))
+        print('layer_name: {:s},\treceptive_field:{:.2f},\t number: {:d}'
+              .format(last_layer_name, last_receptive_field, len(res)))
     return res
 
 
@@ -506,10 +506,10 @@ def filter_part_object_scores(all_next_part_object_scores, keep, filter_pad=True
 
 
 def print_all_children(all_next_part_object_scores):
-    print 'all children score map and their spatial position'
+    print('all children score map and their spatial position')
     for next_part_object_scores in all_next_part_object_scores:
-        print next_part_object_scores.spatial_position
-        print next_part_object_scores.get_score_map()
+        print(next_part_object_scores.spatial_position)
+        print(next_part_object_scores.get_score_map())
 
 
 def draw_all_children_boxes(all_next_part_object_scores):
@@ -637,7 +637,7 @@ def parse_net_proto(prototxt):
             one_layer_info['type'] = 'fc'
             one_layer_info['num_output'] = param.num_output
         else:
-            print 'skip layer {:s}'.format(layer.name)
+            print('skip layer {:s}'.format(layer.name))
             continue
         if is_bn == 2:
             all_layer_info[layer_names[-1]]['bn'] = True
@@ -722,13 +722,15 @@ def threshold_system(queue, **kwargs):
     reserve_ratio = kwargs['reserve_ratio']
     display = kwargs['display']
 
-    print 'input number: {:d}'.format(len(queue))
+    print('input number: {:d}'.format(len(queue)))
     filtered_queue = filter_ratio(queue, reserve_ratio, reserve_num)
-    print 'remain number after reserving the top scores: {:d}'.format(len(filtered_queue))
+    print('remain number after reserving the top scores: {:d}'.format(
+        len(filtered_queue)))
 
     filtered_queue = filter_repeat_part_object_scores(
         filtered_queue, input_shape[-2:])
-    print 'remain number after filtering repeat points: {:d}'.format(len(filtered_queue))
+    print('remain number after filtering repeat points: {:d}'.format(
+        len(filtered_queue)))
 
     return filtered_queue
 
@@ -768,7 +770,7 @@ def get_receptive_field(current_layer_name, layer_sequence, layers_info):
 
 def display(net):
     for layer_name, blob in net.blobs.iteritems():
-        print layer_name + '\t' + str(blob.data.shape)
+        print(layer_name + '\t' + str(blob.data.shape))
 
 
 def get_featmap_size():

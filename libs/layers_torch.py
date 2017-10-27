@@ -4,6 +4,7 @@
 from libs.tools import _get, stop
 from libs.points import *
 import numpy as np
+import torch as T
 
 
 class Layers(object):
@@ -24,6 +25,9 @@ class Layers(object):
         D = _get(layer_info['dilation'], 1)
         dim = points[0].dim
         weight, bias = self.net.get_param_data(layer_name)
+        # convert to torch
+        weight = T.from_numpy(weight)
+        bias = T.from_numpy(bias)
 
         res = []
 
