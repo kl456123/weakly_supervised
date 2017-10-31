@@ -10,8 +10,8 @@ import torch as T
 class Layers(object):
     def __init__(self, net):
         self.net = net
-
 # output point is 2D
+
     def conv(self,
              layer_name,
              points,
@@ -26,8 +26,55 @@ class Layers(object):
         dim = points[0].dim
         weight, bias = self.net.get_param_data(layer_name)
         # convert to torch
-        weight = T.from_numpy(weight)
-        bias = T.from_numpy(bias)
+        if not T.is_tensor(weight):
+            weight = T.from_numpy(weight)
+        if not T.is_tensor(bias):
+            bias = T.from_numpy(bias)
+        # weight = weight.view(weight.size[0],-1)
+        all_point_weight = []
+        all_point_prior = []
+        all_feat_data = []
+        res = []
+        for point in points:
+            all_point_weight.append(point.weight)
+            all_point_prior.append(point.prior)
+            pos = point.pos
+            children_pos = point.get_children_pos(K, S, D, P)
+            bottom_name = self.net._net.bottom_names[layer_name][0]
+            shape = self.net._net.blobs[bottom_name].data.shape
+            data = self.net.get_block_data(bottom_name, children_pos, P)
+            if not T.is_tensor(data):
+                data = T.from_numpy(data)
+            all_feat_data.append(data)
+        all_point_weight = T.cat(all_point_weight)
+        all_point_prior = T.cat(all_point_prior)
+        # all_param = T.cat([all_point_weight,all_point_prior])
+        weighted_weight = all_point_weight * weight
+        weighted_weight = weighted_weight.sum(dim=1)
+        weighted_bias = all_point_weight * bias
+        weighted_bias = weighted_bias.sum(dim=1)
+        all_feat_data = T.from_numpy(np.array(all_feat_data))
+        all_conv = weighted_weight * all_feat_data
+        kdim = K * K
+        all_per_prior = (weighted_bias + all_point_prior) / kdim
+        all_score_map = all_conv.sum(dim=1) + all_per_prior
+        all_score_sum = all_score_map.sum(dim=1)
+        all_threshold = all_score_sum / 5
+        if isFilter:
+            all_keep = all_score_map > all_threshold
+        else:
+            all_keep = all_score_map > -np.inf
+        all_score_map = all_score_map[all_keep].view(all_score_map.size[0],-1)
+        all_keep_weight = weighted_weight[:, all_keep].transpose((1, 0))
+        keep_pos = children_pos[keep.ravel()]
+        num_keep = keep_pos.shape[0]
+        for i in range(num_keep):
+            per_pos = keep_pos[i]
+            per_weight = keep_weight[i]
+            if not check_is_pad(per_pos, shape[2:]):
+                res.append(Point_2D(per_pos,
+                                    per_weight,
+                                    per_prior, score_map[i]))
 
         res = []
 
