@@ -10,12 +10,112 @@ class Layers(object):
     def __init__(self, net):
         self.net = net
 
+    def conv_faster(self,
+                    layer_name,
+                    points,
+                    isFilter=True,
+                    test_part_pos=None):
+        layer_info = self.net.get_layer_info(layer_name)
+        K = layer_info['kernel_size']
+        P = _get(layer_info['pad'], 0)
+        S = _get(layer_info['stride'], 1)
+        D = _get(layer_info['dilation'], 1)
+        dim = points[0].dim
+        weight, bias = self.net.get_param_data(layer_name)
+        c = weight.shape[0]
+        res = []
+        all_weight = []
+        all_prior = []
+        all_feat_data = []
+        all_children_pos = []
+        kdim = K * K
+
+        # if dim == 2:
+        for point in points:
+            pos = point.pos
+            children_pos = point.get_children_pos(K, S, D, P)
+            bottom_name = self.net._net.bottom_names[layer_name][0]
+            shape = self.net._net.blobs[bottom_name].data.shape
+            data = self.net.get_block_data(bottom_name, children_pos, P)
+            data = data.reshape((-1, K, K))
+            all_feat_data.append(data)
+            all_children_pos.append(children_pos)
+            all_prior.append(point.prior)
+            if dim == 2:
+                all_weight.append(point.weight)
+            elif dim == 3:
+                temp_weight = np.zeros(c)
+                temp_weight[int(pos[0])] = point.weight
+                all_weight.append(temp_weight)
+
+        all_weight = np.array(all_weight)
+        all_prior = np.array(all_prior)
+        all_feat_data = np.array(all_feat_data)
+        all_children_pos = np.array(all_children_pos)
+        # if dim == 2:
+        weighted_weight = all_weight[..., np.newaxis,
+                                     np.newaxis, np.newaxis] * weight[np.newaxis, ...]
+        # else:
+        # weighted_weight = all_weight * weight[np.newaxis, ...]
+        weighted_weight = weighted_weight.sum(axis=1)
+        weighted_bias = all_weight * bias[np.newaxis, ...]
+        weighted_bias = weighted_bias.sum(axis=1)
+        all_conv = all_feat_data * weighted_weight
+        all_per_prior = (weighted_bias + all_prior) / kdim
+        all_score_map = all_conv.sum(
+            axis=1) + all_per_prior[..., np.newaxis, np.newaxis]
+        all_score_sum = all_score_map.reshape((-1, kdim)).sum(axis=1)
+        threshold = all_score_sum / 9
+        if isFilter:
+            all_keep = all_score_map > threshold.reshape((-1, 1, 1))
+        else:
+            all_keep = all_score_map > -np.inf
+
+        if test_part_pos is not None:
+            # stop()
+            if all_keep[0, test_part_pos[0], test_part_pos[1]]:
+                all_keep[0, ...] = False
+                part_pos = test_part_pos
+                all_keep[0, part_pos[0], part_pos[1]] = True
+            else:
+                return []
+        all_score_map = all_score_map[all_keep].ravel()
+        # if dim == 2:
+        all_keep_weight = weighted_weight.transpose((1, 0, 2, 3))[
+            :, all_keep].T
+        # else:
+        # all_keep_weight = weighted_weight
+        all_keep_pos = all_children_pos[all_keep.reshape((-1, kdim)), :]
+        num_keep = all_keep_pos.shape[0]
+        # all_per_prior = np.broadcast_to(
+        # all_per_prior, (K, K, all_per_prior.shape[0]).transpose((2, 0, 1))
+        all_per_prior = all_per_prior[..., np.newaxis, np.newaxis]
+        all_per_prior = np.broadcast_to(
+            all_per_prior, (all_per_prior.shape[0], K, K))
+        all_keep_prior = all_per_prior[all_keep]
+        for i in range(num_keep):
+            per_pos = all_keep_pos[i]
+            per_weight = all_keep_weight[i]
+            per_prior = all_keep_prior[i]
+            if not check_is_pad(per_pos, shape[2:]):
+                res.append(Point_2D(per_pos,
+                                    per_weight,
+                                    per_prior,
+                                    all_score_map[i]))
+
+        # elif dim == 3:
+            # weighted_weight = all_weight * weight[int(pos[0])]
+            # weighted_bias = all_weight * bias[int(pos[0])]
+            # weighted_bias = weighted_bias.sum(axis=0)
+        #     pass
+        return res
+
+
 # output point is 2D
     def conv(self,
              layer_name,
              points,
              isFilter=True,
-             PART_TEST=False,
              test_part_pos=None):
         layer_info = self.net.get_layer_info(layer_name)
         K = layer_info['kernel_size']
@@ -50,12 +150,12 @@ class Layers(object):
             per_prior = (weighted_bias + point.prior) / kdim
             score_map = conv.sum(axis=0) + per_prior
             score_sum = score_map.sum()
-            threshold = score_sum / 5
+            threshold = score_sum / 9
             if isFilter:
                 keep = score_map > threshold
             else:
                 keep = score_map > -np.inf
-            if PART_TEST:
+            if test_part_pos is not None:
                 if keep[test_part_pos]:
                     keep[...] = False
                     part_pos = test_part_pos
@@ -273,14 +373,12 @@ class Layers(object):
             elif layer_type == 'conv':
                 if test_flag:
                     test_flag -= 1
-                    PART_TEST = True
                 else:
-                    PART_TEST = False
-                points = self.conv(layer_name,
-                                   points,
-                                   isFilter,
-                                   PART_TEST,
-                                   test_part_pos)
+                    test_part_pos = None
+                points = self.conv_faster(layer_name,
+                                          points,
+                                          isFilter,
+                                          test_part_pos)
             elif layer_type == 'pooling':
                 # self.visualization_vggnet(layer_name, points)
                 points = self.pool_faster(layer_name, points, isFilter)

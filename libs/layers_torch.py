@@ -2,7 +2,7 @@
 # encoding: utf-8
 
 from libs.tools import _get, stop
-from libs.points import *
+from libs.points_torch import *
 import numpy as np
 import torch as T
 

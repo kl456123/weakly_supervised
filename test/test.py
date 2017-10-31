@@ -10,16 +10,16 @@ from libs.points import *
 
 
 def test_part(class_idx, part_pos):
-    model_def = 'model/nin_max_bigger/nin_max_bigger_train_val.prototxt'
-    model_weights = 'model/nin_max_bigger/cifar10_nin_iter_120000.caffemodel'
-    # model_def = 'model/nin_max_big/train_val.prototxt'
-    # model_weights = 'model/nin_max_big/cifar10_nin_iter_120000.caffemodel'
+    # model_def = 'model/nin_max_bigger/nin_max_bigger_train_val.prototxt'
+    # model_weights = 'model/nin_max_bigger/cifar10_nin_iter_120000.caffemodel'
+    model_def = 'model/nin_max_big/train_val.prototxt'
+    model_weights = 'model/nin_max_big/cifar10_nin_iter_120000.caffemodel'
     num_classes = 10
     cls = 0
     classes_name = []
 
     net3 = Net(model_def, model_weights, num_classes)
-    net3._net.forward()
+    # net3._net.forward()
     label = net3._net.blobs['label'].data
     im_list = np.where(label == class_idx)[0]
     # np.where(label==cls)
@@ -194,4 +194,4 @@ def test_demo(image_file):
 # caffe_init()
 # test_all()
 # test_demo('dirty_data.png')
-test_part(9, (0,2))
+test_part(6, (1,1))
