@@ -93,7 +93,7 @@ def test_all():
     cls_idx = net3.get_label()
     print(cls_idx)
     # global config
-    net3.display()
+    # net3.display()
     input_shape = (32, 32)
     layers = Layers(net3)
     kernel_weight = np.zeros((num_classes,))
@@ -189,6 +189,6 @@ def test_demo(image_file):
 
 
 # caffe_init()
-# test_all()
+test_all()
 # test_demo('dirty_data.png')
-test_part(6, (1,1))
+# test_part(6, (1,1))

@@ -4,137 +4,11 @@
 from libs.tools import _get, stop
 from libs.points import *
 import numpy as np
-import torch as T
 
 
 class Layers(object):
     def __init__(self, net):
         self.net = net
-
-    def conv_faster(self,
-                    layer_name,
-                    points,
-                    isFilter=True,
-                    test_part_pos=None):
-        layer_info = self.net.get_layer_info(layer_name)
-        K = layer_info['kernel_size']
-        P = _get(layer_info['pad'], 0)
-        S = _get(layer_info['stride'], 1)
-        D = _get(layer_info['dilation'], 1)
-        dim = points[0].dim
-        weight, bias = self.net.get_param_data(layer_name)
-        n = weight.shape[0]
-        c = weight.shape[1]
-        res = []
-        all_weight = []
-        all_prior = []
-        kdim = K * K
-        bottom_name = self.net._net.bottom_names[layer_name][0]
-        bottom_shape = self.net._net.blobs[bottom_name].data[self.net.img_idx].shape
-
-        for point in points:
-            pos = point.pos
-            all_prior.append(point.prior)
-            if dim == 2:
-                all_weight.append(point.weight)
-            elif dim == 3:
-                temp_weight = np.zeros(n)
-                temp_weight[int(pos[0])] = point.weight
-                all_weight.append(temp_weight)
-
-        weight = tensor(weight)
-        bias = tensor(bias)
-        all_weight = tensor(all_weight)
-        all_prior = tensor(all_prior)
-        weighted_weight = all_weight[:, :, None,
-                                     None, None] * weight[None, :, :, :, :]
-        # weighted_weight = all_weight[..., np.newaxis,
-        # np.newaxis, np.newaxis] * weight[np.newaxis, ...]
-        weighted_weight = weighted_weight.sum(dim=1)
-        weighted_bias = all_weight * bias[None, :]
-        weighted_bias = weighted_bias.sum(dim=1)
-        all_prior = (weighted_bias + all_prior) / kdim
-
-        ##############################################
-        # merge points according to their pos
-        ##############################################
-        all_children_weight_pos_pairs = {}
-        all_children_prior_pos_pairs = {}
-        for idx, point in enumerate(points):
-            pos = point.pos
-            w = weighted_weight[idx]
-            p = all_prior[idx]
-            hash_pos = arr2hash(pos)
-            if hash_pos not in all_children_weight_pos_pairs:
-                all_children_weight_pos_pairs[hash_pos] = []
-                all_children_prior_pos_pairs[hash_pos] = []
-            all_children_weight_pos_pairs[hash_pos].append(w)
-            all_children_prior_pos_pairs[hash_pos].append(p)
-
-        for hash_pos in all_children_weight_pos_pairs:
-            pos = hash2arr(hash_pos)
-            children_pos = get_children_pos(pos, K, S, D, P)
-            children_weight = T.cat(all_children_weight_pos_pairs[hash_pos])
-            data = self.net.get_block_data(bottom_name, children_pos, P)
-            data = data.reshape((-1, K, K))
-            children_conv = data[None, :, :, :] * children_weight
-            all_per_prior = np.array(all_children_prior_pos_pairs[hash_pos])
-            all_score_map = children_conv.sum(
-                dim=1) + all_per_prior[:, None, None]
-            all_score_sum = all_score_map.reshape((-1, kdim)).sum(dim=1)
-            threshold = all_score_sum / 9
-            if isFilter:
-                all_keep = all_score_map > threshold.view((-1, 1, 1))
-            else:
-                all_keep = all_score_map > float('-inf')
-
-            if test_part_pos is not None:
-                if all_keep[0, test_part_pos[0], test_part_pos[1]]:
-                    all_keep[0, :, :] = False
-                    part_pos = test_part_pos
-                    all_keep[0, part_pos[0], part_pos[1]] = True
-                else:
-                    return []
-
-            # all_score_map = all_score_map[all_keep].ravel()
-            all_score_map = all_score_map.ravel()
-            # all_keep_weight = children_weight.transpose((1, 0, 2, 3))[
-            # :, all_keep].T
-            all_keep_weight = children_weight.permute(
-                (0, 2, 3, 1)).view((-1, c))
-            # num_keep = all_keep_weight.shape[0]
-            # all_per_prior = all_per_prior[..., np.newaxis, np.newaxis]
-            # all_per_prior = np.broadcast_to(
-            # all_per_prior, (all_per_prior.shape[0], K, K))
-            # all_keep_prior = all_per_prior[all_keep]
-           #  children_pos = children_pos[np.newaxis, ...]
-            # children_pos = np.broadcast_to(
-            # children_pos, (children_weight.shape[0], kdim, 3)).reshape((-1, 3))
-           #  children_pos = children_pos[all_keep.ravel(), :]
-            num = all_keep.size
-            all_keep = all_keep.view(-1)
-            for i in range(num):
-                if all_keep[i]:
-                    per_pos = children_pos[i % kdim]
-                    per_weight = all_keep_weight[i]
-                    per_prior = all_per_prior[i / kdim]
-                    if not check_is_pad(per_pos, bottom_shape[-2:]):
-                        res.append(Point_2D(per_pos,
-                                            per_weight,
-                                            per_prior,
-                                            all_score_map[i]))
-
-            # for i in range(num_keep):
-                # per_pos = children_pos[i]
-                # per_weight = all_keep_weight[i]
-                # per_prior = all_keep_prior[i]
-                # if not check_is_pad(per_pos, bottom_shape[-2:]):
-                    # res.append(Point_2D(per_pos,
-                    # per_weight,
-                    # per_prior,
-            #                             all_score_map[i]))
-
-        return res
 
 
 # output point is 2D
@@ -401,7 +275,7 @@ class Layers(object):
                     test_flag -= 1
                 else:
                     test_part_pos = None
-                points = self.conv_faster(layer_name,
+                points = self.conv(layer_name,
                                           points,
                                           isFilter,
                                           test_part_pos)
@@ -536,10 +410,4 @@ def get_children_pos(pos, K, S=1, D=1, P=0, filter_pad=False):
     return np.array(res)
 
 
-def tensor(arr, dtype=T.cuda.FloatTensor):
-    if isinstance(arr, list) or isinstance(arr, tuple):
-        arr = np.array(arr)
-    if isinstance(arr, np.ndarray):
-        return T.from_numpy(arr).type(dtype)
-    if T.is_tensor(arr):
-        return arr
+
