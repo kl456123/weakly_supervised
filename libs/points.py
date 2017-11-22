@@ -2,7 +2,9 @@
 # encoding: utf-8
 
 import numpy as np
-from libs.tools import stop, feat_map_raw
+from libs.common_helper import stop, feat_map_raw
+from libs.pytorch_helper import tensor
+import torch as T
 
 
 class Point(object):
@@ -45,21 +47,12 @@ class Point_2D(Point):
         self.pos = np.array(self.pos).astype(np.float)
         self.pos[0] = np.nan
 
-    # def set_score(self, point_data):
-        # assert point_data
-
-        # def get_children_pos_3D(self, shape_3D):
-        # num = weight.shape[0]
-        # C, H, W = shape_3D
-        # assert C * H * W == num
-        # return zip(np.unravel_index(np.arange(num), shape_3D))
-
 
 class Point_3D(Point):
     def __init__(self, pos, weight, prior=0, score=0):
-        if isinstance(weight, int) or isinstance(weight, float):
-            weight = np.array(weight)
-        assert len(weight.shape) == 0
+        # if isinstance(weight, int) or isinstance(weight, float):
+            # weight = (weight)
+        # assert len(weight.shape[0]) == 0
         super(Point_3D, self).__init__(pos,
                                        weight,
                                        prior,
@@ -170,8 +163,8 @@ def merge_points_2D(points_2D, shape_2D):
 
 
 def get_least_num(scores, ratio):
-    scores = np.sort(scores)[::-1]
-    sum_scores = scores.sum(axis=0)
+    scores, _ = scores.sort(dim=0, descending=True)
+    sum_scores = scores.sum()
     least_scores = sum_scores * ratio
     tmp_sum = 0
     for i, s in enumerate(scores):
@@ -192,7 +185,7 @@ def filter_points_ratio(points, scores, reserve_num_ratio=1, reserve_num=5000, r
         least_num = num
     reserve_num = np.maximum(reserve_num, least_num)
     reserve_num = np.minimum(max_num, reserve_num)
-    sorted_idx = np.argsort(-scores)
+    _, sorted_idx = scores.sort(dim=0, descending=True)
     sorted_idx = sorted_idx[:reserve_num]
     for idx in sorted_idx:
         res.append(points[idx])
@@ -217,7 +210,7 @@ def mapping_points(points, feat_size, raw_size):
 def threshold_system(points, scores, **kwargs):
     # stop()
     # read args
-    assert len(points) == scores.size, 'each point must has its score'
+    assert len(points) == scores.shape[0], 'each point must has its score'
     input_shape = kwargs['input_shape']
     reserve_num = kwargs['reserve_num']
     reserve_num_ratio = kwargs['reserve_num_ratio']
@@ -244,15 +237,21 @@ def threshold_system(points, scores, **kwargs):
 
 
 def post_filter_points(points, scores, **kwargs):
-    assert len(points) == scores.size, 'each point must has its score'
+    size = len(points)
+    # if size < 1e3:
+    # return points, scores
+    assert size == scores.shape[0], 'each point must has its score'
     # stop()
-    # reserve_scores_ratio = kwargs['reserve_scores_ratio']
+    reserve_scores_ratio = kwargs['reserve_scores_ratio']
     # reserve_num = kwargs['reserve_num']
     max_num = kwargs['max_num']
     print('post filter start to prevent from\n large amount of points')
     print('input number: {:d}'.format(len(points)))
     filtered_points, filtered_scores = filter_points_ratio(points,
                                                            scores,
+                                                           # reserve_num_ratio=reserve_num_ratio,
+                                                           # reserve_num=5000,
+                                                           reserve_scores_ratio=reserve_scores_ratio,
                                                            max_num=max_num)
     print('remain number: {:d}'.format(len(filtered_points)))
     # points, scores = filter_negative_points(points, scores)
@@ -262,20 +261,19 @@ def post_filter_points(points, scores, **kwargs):
 
 def cluster_points(points, threshold):
     # used for 2D points
-    pos = points[0].pos
     num = len(points)
-    pos_arr = np.zeros((num, points[0].weight.size))
+    pos_arr = tensor(np.zeros((num, points[0].weight.shape[0])))
     for i, point in enumerate(points):
         dim = points[0].dim
         assert dim == 2, 'points must be 2D'
         pos_arr[i] = point.weight
-    norm = np.linalg.norm(pos_arr, axis=1)
-    if norm[norm == 0].size > 0:
+    norm = tensor(np.linalg.norm(pos_arr.cpu().numpy(), axis=1))
+    if len(norm[norm == 0]) > 0:
         stop()
-    pos_arr = pos_arr / norm[..., np.newaxis]
+    pos_arr = pos_arr / norm[..., None]
     # matrix = np.dot(pos_arr, pos_arr.T)
     # matrix>threshold
-    used = np.zeros((num,))
+    used = T.zeros((num,))
     res = []
     for i in range(num):
         if used[i]:
@@ -287,7 +285,7 @@ def cluster_points(points, threshold):
             idx = i + j + 1
             if used[idx]:
                 continue
-            if (pos_arr[i] * pos_arr[idx]).sum(axis=0) > threshold:
+            if (pos_arr[i] * pos_arr[idx]).sum() > threshold:
                 used[idx] = 1
                 weight += pos_arr[idx] * norm[idx]
                 prior += points[idx].prior
@@ -302,7 +300,6 @@ def helper_cluster_points(points, shape_2D, threshold=0.8):
         return points
     # stop()
     dict_points = {}
-    h = shape_2D[0]
     w = shape_2D[1]
     for point in points:
         hash_pos = str(point.pos[1] * w + point.pos[2])

@@ -7,24 +7,30 @@ import os
 from libs.tools import *
 
 
+# usage of net
+# work as database , for retriving information about network
+
 class Net(object):
-    def __init__(self, model_def, model_weights, num_classes, deploy=False):
+    def __init__(self, model_def, model_weights, num_classes, num_preforward=1):
         self.model_def = os.path.abspath(model_def)
         self.model_weights = os.path.abspath(model_weights)
 
         self._net = caffe.Net(model_def, model_weights, caffe.TEST)
         self.generate_layer_info(model_def)
         # for load data into layer
-        if not deploy:
-            self._net.forward()
+        self.forward(num_preforward)
+
         self.batch_size = None
         # defaults image,you can change it
         self.img_idx = 0
         self.num_classes = num_classes
-        # self.set_layer_info()
         self.receptive_field_info = {}
         self.generate_layer_sequence()
         self.all_layer_sequence = self.layer_sequence
+
+    def forward(self, num):
+        for i in range(num):
+            self._net.forward()
 
     def get_block_data(self, bottom_name, all_positions, P):
         if (P != 0):
@@ -89,14 +95,20 @@ class Net(object):
     def get_bottom_name(self, layer_name):
         return self._net.bottom_names[layer_name][0]
 
-    def get_blob_info_by_layer_name(self, current_layer_name):
-        # stop()
-        # top blob info is in the top of layer
-        layer_name = self.get_parent_layer_name(current_layer_name)
-        if layer_name is None:
-            print('no parent exist ,may be the top layer')
-            return None
-        return self.get_layer_info(layer_name)
+    def get_top_name(self, layer_name):
+        return self._net.top_names[layer_name][0]
+
+    def get_blob_shape_by_layer_name(self, layer_name, pos):
+        if pos == 'top':
+            blob_name = self.get_top_name(layer_name)
+        elif pos == 'bottom':
+            blob_name = self.get_bottom_name(layer_name)
+        else:
+            raise NotImplementedError
+        return self.get_blob_shape_by_blob_name(blob_name)
+
+    def get_blob_shape_by_blob_name(self, blob_name):
+        return self._net.blobs[blob_name].data[self.img_idx].shape
 
     def display(self):
         for layer_name, blob in self._net.blobs.iteritems():
@@ -330,9 +342,6 @@ class Net(object):
         conved_spatial_feat = data_croped * weight
         return conved_spatial_feat.sum(axis=1), bias
 
-#      def get_next_layer_name(self, layer_name):
-        #  self._layer_info.keys()[]
-
     def get_next_position_feat_pairs(self, layer_name, next_layer_name, spatial_position, kernel_idx):
         weight, bias = self.get_param_data(layer_name)
         h = weight.shape[-2]
@@ -344,8 +353,6 @@ class Net(object):
         all_idx_weight_pairs = self.get_filtered_kernel_idx_weight_pairs(
             layer_name, spatial_position, kernel_idx)
         res = []
-        #  import pdb
-        #  pdb.set_trace()
         for idx, idx_weight_pairs in enumerate(all_idx_weight_pairs):
             kernel_spatial = (idx / w, idx % w)
             next_spatial_position = out_map_in(
@@ -363,9 +370,6 @@ class Net(object):
         return start_spatial_position, (conved_spatial_feat[kernel_idx], bias[kernel_idx])
 
     def generate_all_receptive_field(self):
-        # temp init
-        # self.receptive_field_info['conv5'] = 26
-        # self.receptive_field_info['conv4'] = 18
         layer_sequence = self.layer_sequence
         for layer_name in layer_sequence:
             self.generate_receptive_field(layer_name)
