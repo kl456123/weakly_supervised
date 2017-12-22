@@ -13,6 +13,37 @@ class Layers(object):
     def __init__(self, net):
         self.net = net
 
+    def get_part_score(self,
+                       layer_name,
+                       points):
+        assert len(points) == 1, 'the len of point is 1'
+        point = points[0]
+
+        layer_info = self.net.get_layer_info(layer_name)
+        K = layer_info['kernel_size']
+        P = get(layer_info['pad'], 0)
+        S = get(layer_info['stride'], 1)
+        D = get(layer_info['dilation'], 1)
+        weight, bias = self.net.get_param_data(layer_name)
+        weight = tensor(weight)
+        bias = tensor(bias)
+        # n = weight.shape[0]
+        c = weight.size()[1]
+        # weight_shape = weight.shape[1:]
+        bottom_name = self.net.get_bottom_name(layer_name)
+        pos = point.pos
+
+        weighted_weight = point.weight * weight[int(pos[0])]
+
+        children_pos = get_children_pos(pos, K, S, D, P)
+        data = tensor(self.net.get_block_data(
+            bottom_name, children_pos, P))
+        conv = data.view((c,K,K))
+        conv.mul_(weighted_weight)
+        score_map = conv.sum(dim=0)
+        return score_map
+
+
     def conv_faster_3D(self,
                        layer_name,
                        points,
@@ -74,7 +105,7 @@ class Layers(object):
         all_weighted_weight = all_weighted_weight.permute(
             0, 2, 3, 1).contiguous().view((-1, c))
         all_keep = all_keep.view(-1)
-        num = all_keep.shape[0]
+        num = all_keep.size()[0]
         for i in range(num):
             if all_keep[i]:
                 per_pos = all_pos[i]
@@ -298,10 +329,10 @@ class Layers(object):
             K = bottom_data.shape[1]
         top_shape = top_data.shape
         mask = tensor(get_pool_mask(bottom_data, K, S, P))
-        weight = T.zeros(mask.shape[:-1]).cuda()
+        weight = T.zeros(mask.size()[:-1]).cuda()
         prior = T.zeros(weight.size()).cuda()
         res = []
-        num = points[0].weight.shape[0]
+        num = points[0].weight.size()[0]
         assert dim == 2, 'dim ==3 is not supported'
         top_data = tensor(top_data)
         for point in points:
@@ -352,9 +383,10 @@ class Layers(object):
                  isFilter=True,
                  debug=False,
                  test_flag=0,
-                 test_part_pos=None):
+                 test_part_pos=None,
+                 test_part=False):
         import time
-        max_num = 50000
+        # max_num = 50000
         all_layer_sequence = self.net.all_layer_sequence
         start_flag = 0
         scores = None
@@ -383,6 +415,8 @@ class Layers(object):
                 else:
                     test_part_pos = None
                 dim = points[0].dim
+                if test_part:
+                    return self.get_part_score(layer_name,points)
                 if dim == 2:
                     points = self.conv_faster(layer_name,
                                               points,
@@ -400,7 +434,7 @@ class Layers(object):
                 points = self.relu(layer_name, points, isFilter)
 
             # empty cache to reduce usage of GPU memory
-            clear()
+            # clear()
             dura_time = time.time() - start_time
             if len(points) == 0:
                 return points, None

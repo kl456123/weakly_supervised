@@ -38,7 +38,7 @@ class Point(object):
 
 class Point_2D(Point):
     def __init__(self, pos, kernel_weight, prior=0, score=0):
-        assert len(kernel_weight.shape) == 1
+        assert len(kernel_weight.size()) == 1
         super(Point_2D, self).__init__(pos,
                                        kernel_weight,
                                        prior,
@@ -135,7 +135,7 @@ def print_point(point):
         print('position:{:s}\tprior:{:.2f}\tweight shape:{:s}'.
               format(str(point.pos),
                      point.prior,
-                     str(point.weight.shape)))
+                     str(point.weight.size())))
 
 
 def merge_points_2D(points_2D, shape_2D):
@@ -210,7 +210,7 @@ def mapping_points(points, feat_size, raw_size):
 def threshold_system(points, scores, **kwargs):
     # stop()
     # read args
-    assert len(points) == scores.shape[0], 'each point must has its score'
+    assert len(points) == scores.size()[0], 'each point must has its score'
     input_shape = kwargs['input_shape']
     reserve_num = kwargs['reserve_num']
     reserve_num_ratio = kwargs['reserve_num_ratio']
@@ -240,7 +240,7 @@ def post_filter_points(points, scores, **kwargs):
     size = len(points)
     # if size < 1e3:
     # return points, scores
-    assert size == scores.shape[0], 'each point must has its score'
+    assert size == scores.size()[0], 'each point must has its score'
     # stop()
     reserve_scores_ratio = kwargs['reserve_scores_ratio']
     # reserve_num = kwargs['reserve_num']
@@ -262,7 +262,7 @@ def post_filter_points(points, scores, **kwargs):
 def cluster_points(points, threshold):
     # used for 2D points
     num = len(points)
-    pos_arr = tensor(np.zeros((num, points[0].weight.shape[0])))
+    pos_arr = tensor(np.zeros((num, points[0].weight.size()[0])))
     for i, point in enumerate(points):
         dim = points[0].dim
         assert dim == 2, 'points must be 2D'

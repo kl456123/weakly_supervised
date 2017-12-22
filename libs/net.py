@@ -28,9 +28,25 @@ class Net(object):
         self.generate_layer_sequence()
         self.all_layer_sequence = self.layer_sequence
 
-    def forward(self, num):
+    def forward(self, num=1):
         for i in range(num):
             self._net.forward()
+
+    def save(self):
+        model_name = self.model_weights + '_neg'
+        self._net.save(model_name)
+
+    def filter_negative(self, neg_layer_name):
+        # other than the first layer in the net
+        for layer_name in self.all_layer_sequence[1:]:
+            if not self._layer_info[layer_name]['type'] == 'conv':
+                continue
+            if (neg_layer_name is not None) and (not neg_layer_name == layer_name):
+                continue
+            print('filter layer_name %s' % (layer_name))
+            weight, bias = self.get_param_data(layer_name)
+            weight[weight < 0] = 0
+            bias[bias > 0] = 0
 
     def get_block_data(self, bottom_name, all_positions, P):
         if (P != 0):
@@ -169,10 +185,17 @@ class Net(object):
         pred_blob = 'pool3'
         return self._net.blobs[pred_blob].data[img_idx].argmax()
 
+    def get_all_prediction(self):
+        pred_blob = 'pool3'
+        return self._net.blobs[pred_blob].data.argmax(1).reshape((-1))
+
     def get_label(self, img_idx=None):
         if img_idx is None:
             img_idx = self.img_idx
         return int(self._net.blobs['label'].data[img_idx])
+
+    def get_all_label(self):
+        return self._net.blobs['label'].data.astype(np.int)
 
     def get_receptive_field_data(self, blob_name, spatial_scope, pad=0, one_img=True):
         pass
